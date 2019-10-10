@@ -1,0 +1,3155 @@
+From 2769d7f340dd01e15684fbfbb0a005c5b815307a Mon Sep 17 00:00:00 2001
+From: Eric Meddaugh <eric@meddaughs.com>
+Date: Fri, 5 Jul 2019 13:32:17 -0400
+Subject: [PATCH] msm8996: Update fingerprint driver for Oreo
+
+Change-Id: I61ca30d9fd80a30526c74e97d01a63513264f956
+---
+ .../dts/lge/msm8996-fingerprint-fpc1022.dtsi  |  184 +-
+ drivers/input/fingerprint/Kconfig             |   10 -
+ drivers/input/fingerprint/Makefile            |    2 -
+ drivers/input/fingerprint/fpc1020_tee.c       |  739 ++++----
+ drivers/input/fingerprint/fpc_btp.c           | 1550 -----------------
+ drivers/input/fingerprint/fpc_btp.h           |   24 -
+ drivers/input/fingerprint/fpc_btp_regs.h      |   82 -
+ drivers/input/fingerprint/fpc_log.h           |   63 -
+ 8 files changed, 321 insertions(+), 2333 deletions(-)
+ delete mode 100644 drivers/input/fingerprint/fpc_btp.c
+ delete mode 100644 drivers/input/fingerprint/fpc_btp.h
+ delete mode 100644 drivers/input/fingerprint/fpc_btp_regs.h
+ delete mode 100644 drivers/input/fingerprint/fpc_log.h
+
+diff --git a/arch/arm64/boot/dts/lge/msm8996-fingerprint-fpc1022.dtsi b/arch/arm64/boot/dts/lge/msm8996-fingerprint-fpc1022.dtsi
+index 9ed76280d59e..d498b500dd52 100644
+--- a/arch/arm64/boot/dts/lge/msm8996-fingerprint-fpc1022.dtsi
++++ b/arch/arm64/boot/dts/lge/msm8996-fingerprint-fpc1022.dtsi
+@@ -1,4 +1,4 @@
+-/* Copyright (c) 2014, The Linux Foundation. All rights reserved.
++/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -9,86 +9,36 @@
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+  */
+-/{
+-	aliases {
+-		spi8 = &spi_8;
+-	};
+-
+-	reserved-memory {
+-		removed_regions: removed_regions@85800000 {
+-			reg = <0 0x85800000 0 0x2800000>;
+-		};
+-	};
+-};
+ 
+ &soc {
+ 	qcom_seecom: qseecom@86600000 {
+ 		reg = <0x86600000 0x1A00000>;
+ 	};
+ 
+-	/* PIN CONTROL for FPC */
+-	tlmm: pinctrl@01010000 {
+-		fpc_spi_active {
+-			fpc_spi_active: active {
+-				mux {
+-					pins = "gpio49", "gpio50",
+-							"gpio51", "gpio52";
+-					function = "blsp_spi9";
+-				};
+-
+-				config {
+-					pins = "gpio49", "gpio50",
+-							"gpio51", "gpio52";
+-					drive-strength = <6>;
+-					bias-disable;
+-				};
+-			};
+-		};
+-
+-		fpc_cs_manual {
+-			fpc_cs_low: output-low {
+-				mux {
+-					pins = "gpio51";
+-					function = "gpio";
+-				};
+-
+-				config {
+-					pins = "gpio51";
+-					bias-disable;
+-					drive_strength = <2>;
+-					ouput-low;
+-				};
+-			};
+-			fpc_cs_high: output-high {
+-				mux {
+-					pins = "gpio51";
+-					function = "gpio";
+-				};
+-
+-				config {
+-					pins = "gpio51";
+-					bias-disable;
+-					drive_strength = <2>;
+-					ouput-high;
+-				};
+-			};
+-		};
++	fp_fpc1020 {
++		status = "ok";
++		compatible = "fpc,fpc1020";
++		interrupt-parent = <&tlmm>;
++		interrupts = <121 0x0>;
++		fpc,gpio_rst	= <&tlmm 40 0>;
++		fpc,gpio_irq	= <&tlmm 38 0>;
++		/* vcc_spi-supply  = <&pm8994_s4>; */
++		vdd_io-supply	= <&pm8994_lvs2>; /*default regulator to lvs2 since rev.c*/
++		/* vdd_ana-supply  = <&pm8996_l18>; */
++		fpc,enable-on-boot;
++		fpc,enable-wakeup;
+ 
+-		fpc_cs_active {
+-			fpc_cs_active: spi-active {
+-				mux {
+-					pins = "gpio51";
+-					function = "gpio";
+-				};
++		pinctrl-names = "fpc1020_reset_reset",
++			"fpc1020_reset_active",
++			"fpc1020_irq_active";
+ 
+-				config {
+-					pins = "gpio51";
+-					bias-disable;
+-					drive_strength = <2>;
+-				};
+-			};
+-		};
++		pinctrl-0 = <&fpc_reset_reset>;
++		pinctrl-1 = <&fpc_reset_active>;
++		pinctrl-2 = <&fpc_irq_active>;
++	};
++};
+ 
++&tlmm {
+ 		fpc_reset {
+ 			fpc_reset_reset: reset {
+ 				mux {
+@@ -133,94 +83,4 @@
+ 			};
+ 		};
+ 
+-	};
+-	fpc,btp {
+-		status = "ok";
+-		compatible = "fpc,btp";
+-		interrupt-parent = <&tlmm>;
+-		interrupts = <38 0x0>;
+-		qcom,qup-id = <8>; /* for tz */
+-		use_regulator = <1>;
+-		fpc,vddio-supply = <&pm8994_l12>;
+-		fpc,gpio_irq	=  <&tlmm 38 0x00>;
+-		fpc,gpio_reset	= <&tlmm 40 0x00>;
+-		fpc,gpio_cs	= <&tlmm 51 0x00>;
+-	};
+-
+-	spi_8: spi@75B7000 { /* BLSP2 QUP3 */
+-		compatible = "qcom,spi-qup-v2";
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-		reg-names = "spi_physical", "spi_bam_physical";
+-		reg = <0x075B7000 0x600>,
+-			<0x07584000 0x2b000>;
+-		interrupt-names = "spi_irq", "spi_bam_irq";
+-		interrupts = <0 103 0>, <0 239 0>;
+-		spi-max-frequency = <19200000>;
+-
+-		qcom,infinite-mode = <0>;
+-		qcom,use-bam;
+-		qcom,ver-reg-exists;
+-		qcom,bam-consumer-pipe-index = <16>;
+-		qcom,bam-producer-pipe-index = <17>;
+-		qcom,master-id = <84>;
+-		qcom,shared;
+-		/*
+-		qcom,use-pinctrl;
+-		pinctrl-names = "spi_default", "spi_sleep";
+-		pinctrl-0 = <&spi_0_active &spi_0_cs_active>;
+-		pinctrl-1 = <&spi_0_sleep &spi_0_cs_sleep>;
+-		*/
+-		clock-names = "iface_clk", "core_clk";
+-
+-		clocks = <&clock_gcc clk_gcc_blsp2_ahb_clk>,
+-			 <&clock_gcc clk_gcc_blsp2_qup3_spi_apps_clk>;
+-	};
+-};
+-
+-&spi_8 {
+-
+-	fpc1020@1 {
+-		status = "ok";
+-		reg = <1>;
+-		compatible = "fpc,fpc1020";
+-		input-device-name = "fpc1020";
+-		interrupt-parent = <&tlmm>;
+-		interrupts = <38>;
+-		fpc,gpio_cs0	= <&tlmm 51 0>;
+-		/*fpc,gpio_cs1	  = <&tlmm 51 0>;*/
+-		fpc,gpio_rst	= <&tlmm 40 0>;
+-		fpc,gpio_irq	= <&tlmm 38 0>;
+-
+-		/*vcc_spi-supply  = <&pm8994_s4>;*/
+-		/*vdd_ana-supply  = <&pm8994_l32>;*/
+-		vdd_io-supply	= <&pm8994_lvs2>; /*default regulator to lvs2 since rev.c*/
+-		fpc,use_fpc2050 = <1>;
+-		fpc,enable-on-boot;
+-		fpc,enable-wakeup;
+-		/* EV_MSC, MSC_SCAN */
+-		fpc,event-type = <4>;
+-		fpc,event-code = <4>;
+-		spi-max-frequency = <4800000>;
+-		spi-qup-id = <8>;
+-		clock-names = "iface_clk", "core_clk";
+-		clocks = <&clock_gcc clk_gcc_blsp2_ahb_clk>,
+-			<&clock_gcc clk_gcc_blsp2_qup3_spi_apps_clk>;
+-
+-		pinctrl-names = "fpc1020_spi_active",
+-					"fpc1020_reset_reset",
+-					"fpc1020_reset_active",
+-					"fpc1020_cs_low",
+-					"fpc1020_cs_high",
+-					"fpc1020_cs_active",
+-					"fpc1020_irq_active";
+-
+-		pinctrl-0 = <&fpc_spi_active>;
+-		pinctrl-1 = <&fpc_reset_reset>;
+-		pinctrl-2 = <&fpc_reset_active>;
+-		pinctrl-3 = <&fpc_cs_low>;
+-		pinctrl-4 = <&fpc_cs_high>;
+-		pinctrl-5 = <&fpc_cs_active>;
+-		pinctrl-6 = <&fpc_irq_active>;
+-	};
+ };
+diff --git a/drivers/input/fingerprint/Kconfig b/drivers/input/fingerprint/Kconfig
+index ab7cbf6b33e4..6eae34a8fe31 100644
+--- a/drivers/input/fingerprint/Kconfig
++++ b/drivers/input/fingerprint/Kconfig
+@@ -11,16 +11,6 @@ menuconfig INPUT_FINGERPRINT
+ 
+ if INPUT_FINGERPRINT
+ 
+-config INPUT_FINGERPRINT_FPC_BTP
+-	tristate "FPC1022 fingerprint sensor support by CrucialSoft"
+-	depends on SPI_MASTER
+-	help
+-	 Say Y here if you want to support FPC1022
+-	 connected via an SPI bus.
+-
+-	 To compile this driver as a module, choose M here: the module
+-	 will be called FPC1022.
+-
+ config INPUT_FINGERPRINT_FPC1020
+ 	tristate "FPC1022 fingerprint sensor support by FPC"
+ 	depends on SPI_MASTER
+diff --git a/drivers/input/fingerprint/Makefile b/drivers/input/fingerprint/Makefile
+index bfbd8b3e5036..6c81d37cc75c 100644
+--- a/drivers/input/fingerprint/Makefile
++++ b/drivers/input/fingerprint/Makefile
+@@ -5,6 +5,4 @@
+ # Each configuration option enables a list of files.
+ ccflags-y += -Idrivers/misc/
+ 
+-obj-$(CONFIG_INPUT_FINGERPRINT_FPC_BTP)		+= fpc_btp.o
+ obj-$(CONFIG_INPUT_FINGERPRINT_FPC1020)		+= fpc1020_tee.o
+-
+diff --git a/drivers/input/fingerprint/fpc1020_tee.c b/drivers/input/fingerprint/fpc1020_tee.c
+index 105f1d2d76b8..00d7095da4b9 100644
+--- a/drivers/input/fingerprint/fpc1020_tee.c
++++ b/drivers/input/fingerprint/fpc1020_tee.c
+@@ -4,22 +4,16 @@
+  * This driver will control the platform resources that the FPC fingerprint
+  * sensor needs to operate. The major things are probing the sensor to check
+  * that it is actually connected and let the Kernel know this and with that also
+- * enabling and disabling of regulators, enabling and disabling of platform
+- * clocks, controlling GPIOs such as SPI chip select, sensor reset line, sensor
+- * IRQ line, MISO and MOSI lines.
++ * enabling and disabling of regulators, controlling GPIOs such as sensor reset
++ * line, sensor IRQ line.
+  *
+  * The driver will expose most of its available functionality in sysfs which
+  * enables dynamic control of these features from eg. a user space process.
+  *
+  * The sensor's IRQ events will be pushed to Kernel's event handling system and
+- * are exposed in the drivers event node. This makes it possible for a user
+- * space process to poll the input node and receive IRQ events easily. Usually
+- * this node is available under /dev/input/eventX where 'X' is a number given by
+- * the event system. A user space process will need to traverse all the event
+- * nodes and ask for its parent's name (through EVIOCGNAME) which should match
+- * the value in device tree named input-device-name.
++ * are exposed in the drivers event node.
+  *
+- * This driver will NOT send any SPI commands to the sensor it only controls the
++ * This driver will NOT send any commands to the sensor it only controls the
+  * electrical parts.
+  *
+  *
+@@ -30,38 +24,35 @@
+  * as published by the Free Software Foundation.
+  */
+ 
+-#include <linux/clk.h>
++#include <linux/atomic.h>
+ #include <linux/delay.h>
+ #include <linux/gpio.h>
+ #include <linux/interrupt.h>
++#include <linux/fb.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/mutex.h>
+ #include <linux/of.h>
+ #include <linux/of_gpio.h>
++#include <linux/platform_device.h>
+ #include <linux/regulator/consumer.h>
+-#include <linux/spi/spi.h>
+-#include <soc/qcom/scm.h>
+-
+-#include <linux/wakelock.h>
+-#define FPC1020_RESET_LOW_US 1000
+-#define FPC1020_RESET_HIGH1_US 100
+-#define FPC1020_RESET_HIGH2_US 1250
+-#define FPC_TTW_HOLD_TIME 1000
+-#define SET_PIPE_OWNERSHIP
+-#define ENABLE_WAKEUP
+-/*
+- * Temporary work around that frees irq resource completely on suspend
+- * Reacquire IRQ resource on resume. See below suspend/resume code
+- * */
+-#define HW240_TEMP_WA
++#include <linux/input.h>
++#define FPC_TTW_HOLD_TIME 1500
++
++#define RESET_LOW_SLEEP_MIN_US 5000
++#define RESET_LOW_SLEEP_MAX_US (RESET_LOW_SLEEP_MIN_US + 100)
++#define RESET_HIGH_SLEEP1_MIN_US 100
++#define RESET_HIGH_SLEEP1_MAX_US (RESET_HIGH_SLEEP1_MIN_US + 100)
++#define RESET_HIGH_SLEEP2_MIN_US 5000
++#define RESET_HIGH_SLEEP2_MAX_US (RESET_HIGH_SLEEP2_MIN_US + 100)
++#define PWR_ON_SLEEP_MIN_US 100
++#define PWR_ON_SLEEP_MAX_US (PWR_ON_SLEEP_MIN_US + 900)
++
++#define NUM_PARAMS_REG_ENABLE_SET 2
++
+ static const char * const pctl_names[] = {
+-	"fpc1020_spi_active",
+ 	"fpc1020_reset_reset",
+ 	"fpc1020_reset_active",
+-	"fpc1020_cs_low",
+-	"fpc1020_cs_high",
+-	"fpc1020_cs_active",
+ 	"fpc1020_irq_active",
+ };
+ 
+@@ -72,34 +63,34 @@ struct vreg_config {
+ 	int ua_load;
+ };
+ 
+-static const struct vreg_config const vreg_conf[] = {
+-	{ "vdd_ana", 1800000UL, 1800000UL, 6000, },
+-	{ "vcc_spi", 1800000UL, 1800000UL, 10, },
++static const struct vreg_config vreg_conf[] = {
+ 	{ "vdd_io", 1800000UL, 1800000UL, 6000, },
+ };
+ 
+ struct fpc1020_data {
+ 	struct device *dev;
+-	struct spi_device *spi;
++
++	struct input_dev *input;
+ 	struct pinctrl *fingerprint_pinctrl;
+ 	struct pinctrl_state *pinctrl_state[ARRAY_SIZE(pctl_names)];
+-	struct clk *iface_clk;
+-	struct clk *core_clk;
+ 	struct regulator *vreg[ARRAY_SIZE(vreg_conf)];
+ 
+-    struct wake_lock ttw_wl;
+ 	int irq_gpio;
+-	int cs0_gpio;
+-	int cs1_gpio;
+ 	int rst_gpio;
+-	int qup_id;
+-	struct mutex lock;
++	bool irq_enabled;
++	struct notifier_block fb_notif;
++	struct mutex lock; /* To set/get exported values in sysfs */
++	struct work_struct pm_work;
++	struct workqueue_struct *fpc1020_wq;
+ 	bool prepared;
+-	bool wakeup_enabled;
+-	bool clocks_enabled;
+-	bool clocks_suspended;
++	int screen_on;
++	int proximity_state; /* 0:far 1:near */
++	atomic_t wakeup_enabled; /* Used both in ISR and non-ISR */
+ };
+ 
++static int fb_notifier_callback(struct notifier_block *self,
++		unsigned long event, void *data);
++
+ static int vreg_setup(struct fpc1020_data *fpc1020, const char *name,
+ 	bool enable)
+ {
+@@ -110,21 +101,26 @@ static int vreg_setup(struct fpc1020_data *fpc1020, const char *name,
+ 
+ 	for (i = 0; i < ARRAY_SIZE(fpc1020->vreg); i++) {
+ 		const char *n = vreg_conf[i].name;
++
+ 		if (!strncmp(n, name, strlen(n)))
+ 			goto found;
+ 	}
++
+ 	dev_err(dev, "Regulator %s not found\n", name);
++
+ 	return -EINVAL;
++
+ found:
+ 	vreg = fpc1020->vreg[i];
+ 	if (enable) {
+ 		if (!vreg) {
+ 			vreg = regulator_get(dev, name);
+-			if (!vreg) {
+-				dev_err(dev, "Unable to get  %s\n", name);
+-				return -ENODEV;
++			if (IS_ERR(vreg)) {
++				dev_err(dev, "Unable to get %s\n", name);
++				return PTR_ERR(vreg);
+ 			}
+ 		}
++
+ 		if (regulator_count_voltages(vreg) > 0) {
+ 			rc = regulator_set_voltage(vreg, vreg_conf[i].vmin,
+ 					vreg_conf[i].vmax);
+@@ -133,12 +129,12 @@ found:
+ 					"Unable to set voltage on %s, %d\n",
+ 					name, rc);
+ 		}
+-		/*
++
+ 		rc = regulator_set_optimum_mode(vreg, vreg_conf[i].ua_load);
+ 		if (rc < 0)
+ 			dev_err(dev, "Unable to set current on %s, %d\n",
+ 					name, rc);
+-		*/
++
+ 		rc = regulator_enable(vreg);
+ 		if (rc) {
+ 			dev_err(dev, "error enabling %s: %d\n", name, rc);
+@@ -157,121 +153,26 @@ found:
+ 		}
+ 		rc = 0;
+ 	}
+-	return rc;
+-}
+ 
+-/**
+- * Prepare or unprepare the SPI master that we are soon to transfer something
+- * over SPI.
+- *
+- * Please see Linux Kernel manual for SPI master methods for more information.
+- *
+- * @see Linux SPI master methods
+- */
+-static int spi_set_fabric(struct fpc1020_data *fpc1020, bool active)
+-{
+-	struct spi_master *master = fpc1020->spi->master;
+-
+-	int rc = active ?
+-		master->prepare_transfer_hardware(master) :
+-		master->unprepare_transfer_hardware(master);
+-	if (rc)
+-		dev_err(fpc1020->dev, "%s: rc %d\n", __func__, rc);
+-	else
+-		dev_dbg(fpc1020->dev, "%s: %d ok\n", __func__, active);
+ 	return rc;
+ }
+ 
+ /**
+- * Changes ownership of SPI transfers from TEE to REE side or vice versa.
+- *
+- * SPI transfers can be owned only by one of TEE or REE side at any given time.
+- * This can be changed dynamically if needed but of course that needs support
+- * from underlaying layers. This function will transfer the ownership from REE
+- * to TEE or vice versa.
++ * sysfs node for controlling clocks.
+  *
+- * If REE side uses the SPI master when TEE owns the pipe or vice versa the
+- * system will most likely crash dump.
+- *
+- * If available this should be set at boot time to eg. TEE side and not
+- * dynamically as that will increase the security of the system. This however
+- * implies that there are no other SPI slaves connected that should be handled
+- * from REE side.
+- *
+- * @see SET_PIPE_OWNERSHIP
++ * This is disabled in platform variant of this driver but kept for
++ * backwards compatibility. Only prints a debug print that it is
++ * disabled.
+  */
+-static int set_pipe_ownership(struct fpc1020_data *fpc1020, bool to_tz)
+-{
+-	int rc;
+-	const u32 TZ_BLSP_MODIFY_OWNERSHIP_ID = 3;
+-	const u32 TZBSP_APSS_ID = 3;
+-	const u32 TZBSP_TZ_ID = 1;
+-	struct scm_desc desc = {
+-		.arginfo = SCM_ARGS(2),
+-		.args[0] = fpc1020->qup_id,
+-		.args[1] = to_tz ? TZBSP_TZ_ID : TZBSP_APSS_ID,
+-	};
+-
+-	rc = scm_call2(SCM_SIP_FNID(SCM_SVC_TZ, TZ_BLSP_MODIFY_OWNERSHIP_ID),
+-		&desc);
+-
+-	if (rc || desc.ret[0]) {
+-		dev_err(fpc1020->dev, "%s: scm_call2: responce %llu, rc %d\n",
+-				__func__, desc.ret[0], rc);
+-		return -EINVAL;
+-	}
+-	dev_dbg(fpc1020->dev, "%s: scm_call2: ok\n", __func__);
+-	return 0;
+-}
+-
+-static int set_clks(struct fpc1020_data *fpc1020, bool enable)
+-{
+-	int rc = 0;
+-	mutex_lock(&fpc1020->lock);
+-
+-	if (enable == fpc1020->clocks_enabled)
+-		goto out;
+-
+-	if (enable) {
+-		rc = clk_prepare_enable(fpc1020->core_clk);
+-		if (rc) {
+-			dev_err(fpc1020->dev,
+-					"%s: Error enabling core clk: %d\n",
+-					__func__, rc);
+-			goto out;
+-		}
+-
+-		rc = clk_prepare_enable(fpc1020->iface_clk);
+-		if (rc) {
+-			dev_err(fpc1020->dev,
+-					"%s: Error enabling iface clk: %d\n",
+-					__func__, rc);
+-			clk_disable_unprepare(fpc1020->core_clk);
+-			goto out;
+-		}
+-		dev_dbg(fpc1020->dev, "%s ok. clk rate %u hz\n", __func__,
+-				fpc1020->spi->max_speed_hz);
+-
+-		fpc1020->clocks_enabled = true;
+-	} else {
+-		clk_disable_unprepare(fpc1020->iface_clk);
+-		clk_disable_unprepare(fpc1020->core_clk);
+-		fpc1020->clocks_enabled = false;
+-	}
+-
+-out:
+-	mutex_unlock(&fpc1020->lock);
+-	return rc;
+-}
+-
+-
+ static ssize_t clk_enable_set(struct device *dev,
+-		struct device_attribute *attr, const char *buf, size_t count)
++	struct device_attribute *attr,
++	const char *buf, size_t count)
+ {
+-	struct  fpc1020_data *fpc1020 = dev_get_drvdata(dev);
+-	return set_clks(fpc1020, (*buf == '1')) ? : count;
+-}
++	dev_dbg(dev,
++		"clk_enable sysfs node not enabled in platform driver\n");
+ 
++	return count;
++}
+ static DEVICE_ATTR(clk_enable, S_IWUSR, NULL, clk_enable_set);
+ 
+ /**
+@@ -291,8 +192,10 @@ static int select_pin_ctl(struct fpc1020_data *fpc1020, const char *name)
+ 	size_t i;
+ 	int rc;
+ 	struct device *dev = fpc1020->dev;
++
+ 	for (i = 0; i < ARRAY_SIZE(fpc1020->pinctrl_state); i++) {
+ 		const char *n = pctl_names[i];
++
+ 		if (!strncmp(n, name, strlen(n))) {
+ 			rc = pinctrl_select_state(fpc1020->fingerprint_pinctrl,
+ 					fpc1020->pinctrl_state[i]);
+@@ -303,76 +206,38 @@ static int select_pin_ctl(struct fpc1020_data *fpc1020, const char *name)
+ 			goto exit;
+ 		}
+ 	}
++
+ 	rc = -EINVAL;
+ 	dev_err(dev, "%s:'%s' not found\n", __func__, name);
++
+ exit:
+ 	return rc;
+ }
+ 
+-/**
+- * sysfs node handler to support dynamic change of SPI transfers' ownership
+- * between TEE and REE side.
+- *
+- * An owner in this context is REE or TEE.
+- *
+- * @see set_pipe_ownership
+- * @see SET_PIPE_OWNERSHIP
+- */
+-static ssize_t spi_owner_set(struct device *dev,
++static ssize_t pinctl_set(struct device *dev,
+ 	struct device_attribute *attr, const char *buf, size_t count)
+ {
+-	struct  fpc1020_data *fpc1020 = dev_get_drvdata(dev);
++	struct fpc1020_data *fpc1020 = dev_get_drvdata(dev);
+ 	int rc;
+-	bool to_tz;
+ 
+-	if (!strncmp(buf, "tz", strlen("tz")))
+-		to_tz = true;
+-	else if (!strncmp(buf, "app", strlen("app")))
+-		to_tz = false;
+-	else
+-		return -EINVAL;
+-
+-	rc = set_pipe_ownership(fpc1020, to_tz);
+-	return rc ? rc : count;
+-}
+-static DEVICE_ATTR(spi_owner, S_IWUSR, NULL, spi_owner_set);
++	mutex_lock(&fpc1020->lock);
++	rc = select_pin_ctl(fpc1020, buf);
++	mutex_unlock(&fpc1020->lock);
+ 
+-static ssize_t pinctl_set(struct device *dev,
+-	struct device_attribute *attr, const char *buf, size_t count)
+-{
+-	struct  fpc1020_data *fpc1020 = dev_get_drvdata(dev);
+-	int rc = select_pin_ctl(fpc1020, buf);
+ 	return rc ? rc : count;
+ }
+ static DEVICE_ATTR(pinctl_set, S_IWUSR, NULL, pinctl_set);
+ 
+-/**
+- * Will indicate to the SPI driver that a message is soon to be delivered over
+- * it.
+- *
+- * Exactly what fabric resources are requested is up to the SPI device driver.
+- *
+- * @see spi_set_fabric
+- */
+-static ssize_t fabric_vote_set(struct device *dev,
+-	struct device_attribute *attr, const char *buf, size_t count)
+-{
+-	struct  fpc1020_data *fpc1020 = dev_get_drvdata(dev);
+-	int rc = spi_set_fabric(fpc1020, *buf == '1');
+-	return rc ? rc : count;
+-}
+-static DEVICE_ATTR(fabric_vote, S_IWUSR, NULL, fabric_vote_set);
+-
+ static ssize_t regulator_enable_set(struct device *dev,
+ 	struct device_attribute *attr, const char *buf, size_t count)
+ {
+-	struct  fpc1020_data *fpc1020 = dev_get_drvdata(dev);
++	struct fpc1020_data *fpc1020 = dev_get_drvdata(dev);
+ 	char op;
+ 	char name[16];
+ 	int rc;
+ 	bool enable;
+ 
+-	if (2 != sscanf(buf, "%15s,%c", name, &op))
++	if (sscanf(buf, "%15[^,],%c", name, &op) != NUM_PARAMS_REG_ENABLE_SET)
+ 		return -EINVAL;
+ 	if (op == 'e')
+ 		enable = true;
+@@ -380,48 +245,38 @@ static ssize_t regulator_enable_set(struct device *dev,
+ 		enable = false;
+ 	else
+ 		return -EINVAL;
++
++	mutex_lock(&fpc1020->lock);
+ 	rc = vreg_setup(fpc1020, name, enable);
++	mutex_unlock(&fpc1020->lock);
++
+ 	return rc ? rc : count;
+ }
+ static DEVICE_ATTR(regulator_enable, S_IWUSR, NULL, regulator_enable_set);
+ 
+-static ssize_t spi_bus_lock_set(struct device *dev,
+-	struct device_attribute *attr, const char *buf, size_t count)
+-{
+-	struct  fpc1020_data *fpc1020 = dev_get_drvdata(dev);
+-
+-	if (!strncmp(buf, "lock", strlen("lock")))
+-		spi_bus_lock(fpc1020->spi->master);
+-	else if (!strncmp(buf, "unlock", strlen("unlock")))
+-		spi_bus_unlock(fpc1020->spi->master);
+-	else
+-		return -EINVAL;
+-	return count;
+-}
+-static DEVICE_ATTR(bus_lock, S_IWUSR, NULL, spi_bus_lock_set);
+-
+-static int hw_reset(struct  fpc1020_data *fpc1020)
++static int hw_reset(struct fpc1020_data *fpc1020)
+ {
+ 	int irq_gpio;
+ 	struct device *dev = fpc1020->dev;
+-
+ 	int rc = select_pin_ctl(fpc1020, "fpc1020_reset_active");
++
+ 	if (rc)
+ 		goto exit;
+-	usleep_range(FPC1020_RESET_HIGH1_US, FPC1020_RESET_HIGH1_US + 100);
++	usleep_range(RESET_HIGH_SLEEP1_MIN_US, RESET_HIGH_SLEEP1_MAX_US);
+ 
+ 	rc = select_pin_ctl(fpc1020, "fpc1020_reset_reset");
+ 	if (rc)
+ 		goto exit;
+-	usleep_range(FPC1020_RESET_LOW_US, FPC1020_RESET_LOW_US + 100);
++	usleep_range(RESET_LOW_SLEEP_MIN_US, RESET_LOW_SLEEP_MAX_US);
+ 
+ 	rc = select_pin_ctl(fpc1020, "fpc1020_reset_active");
+ 	if (rc)
+ 		goto exit;
+-	usleep_range(FPC1020_RESET_HIGH1_US, FPC1020_RESET_HIGH1_US + 100);
++	usleep_range(RESET_HIGH_SLEEP2_MIN_US, RESET_HIGH_SLEEP2_MAX_US);
+ 
+ 	irq_gpio = gpio_get_value(fpc1020->irq_gpio);
+ 	dev_info(dev, "IRQ after reset %d\n", irq_gpio);
++
+ exit:
+ 	return rc;
+ }
+@@ -430,100 +285,78 @@ static ssize_t hw_reset_set(struct device *dev,
+ 	struct device_attribute *attr, const char *buf, size_t count)
+ {
+ 	int rc;
+-	struct  fpc1020_data *fpc1020 = dev_get_drvdata(dev);
++	struct fpc1020_data *fpc1020 = dev_get_drvdata(dev);
+ 
+-	if (!strncmp(buf, "reset", strlen("reset")))
++	if (!strncmp(buf, "reset", strlen("reset"))) {
++		mutex_lock(&fpc1020->lock);
+ 		rc = hw_reset(fpc1020);
+-	else
++		mutex_unlock(&fpc1020->lock);
++	} else {
+ 		return -EINVAL;
++	}
++
+ 	return rc ? rc : count;
+ }
+ static DEVICE_ATTR(hw_reset, S_IWUSR, NULL, hw_reset_set);
+ 
+ /**
+- * Will setup clocks, GPIOs, and regulators to correctly initialize the touch
+- * sensor to be ready for work.
++ * Will setup GPIOs, and regulators to correctly initialize the touch sensor to
++ * be ready for work.
+  *
+  * In the correct order according to the sensor spec this function will
+- * enable/disable regulators, SPI platform clocks, and reset line, all to set
+- * the sensor in a correct power on or off state "electrical" wise.
++ * enable/disable regulators, and reset line, all to set the sensor in a
++ * correct power on or off state "electrical" wise.
+  *
+- * @see  spi_prepare_set
++ * @see  device_prepare_set
+  * @note This function will not send any commands to the sensor it will only
+  *       control it "electrically".
+  */
+-static int device_prepare(struct  fpc1020_data *fpc1020, bool enable)
++static int device_prepare(struct fpc1020_data *fpc1020, bool enable)
+ {
+ 	int rc;
+ 
+ 	mutex_lock(&fpc1020->lock);
+ 	if (enable && !fpc1020->prepared) {
+-		spi_bus_lock(fpc1020->spi->master);
+ 		fpc1020->prepared = true;
+ 		select_pin_ctl(fpc1020, "fpc1020_reset_reset");
+-/*
+-		rc = vreg_setup(fpc1020, "vcc_spi", true);
+-		if (rc)
+-			goto exit;
+-*/
+ 		rc = vreg_setup(fpc1020, "vdd_io", true);
+ 		if (rc)
+ 			goto exit_1;
+-/*
+-		rc = vreg_setup(fpc1020, "vdd_ana", true);
+-		if (rc)
+-			goto exit_2;
+-*/
+-		usleep_range(100, 1000);
+-/*
+-		rc = spi_set_fabric(fpc1020, true);
+-		if (rc)
+-			goto exit_3;
+-*/
+-		(void)select_pin_ctl(fpc1020, "fpc1020_cs_high");
+-		(void)select_pin_ctl(fpc1020, "fpc1020_reset_active");
+-		usleep_range(100, 200);
+-		(void)select_pin_ctl(fpc1020, "fpc1020_cs_active");
++		usleep_range(PWR_ON_SLEEP_MIN_US, PWR_ON_SLEEP_MAX_US);
+ 
+-#ifdef SET_PIPE_OWNERSHIP
+-		rc = set_pipe_ownership(fpc1020, true);
+-		if (rc)
+-			goto exit_5;
+-#endif
++		/* As we can't control chip select here the other part of the
++		 * sensor driver eg. the TEE driver needs to do a _SOFT_ reset
++		 * on the sensor after power up to be sure that the sensor is
++		 * in a good state after power up. Okeyed by ASIC.
++		 */
++
++		(void)select_pin_ctl(fpc1020, "fpc1020_reset_active");
+ 	} else if (!enable && fpc1020->prepared) {
+ 		rc = 0;
+-#ifdef SET_PIPE_OWNERSHIP
+-		(void)set_pipe_ownership(fpc1020, false);
+-exit_5:
+-#endif
+-//		(void)spi_set_fabric(fpc1020, false);
+-//exit_3:
+-		(void)select_pin_ctl(fpc1020, "fpc1020_cs_high");
+ 		(void)select_pin_ctl(fpc1020, "fpc1020_reset_reset");
+-		usleep_range(100, 1000);
+-
+-//		(void)vreg_setup(fpc1020, "vdd_ana", false);
+-//exit_2:
+-		(void)vreg_setup(fpc1020, "vdd_io", false);
++		usleep_range(PWR_ON_SLEEP_MIN_US, PWR_ON_SLEEP_MAX_US);
+ exit_1:
+-//		(void)vreg_setup(fpc1020, "vcc_spi", false);
+-//exit:
+-		(void)select_pin_ctl(fpc1020, "fpc1020_cs_low");
++		(void)vreg_setup(fpc1020, "vdd_io", false);
+ 
+ 		fpc1020->prepared = false;
+-		spi_bus_unlock(fpc1020->spi->master);
+ 	} else {
+ 		rc = 0;
+ 	}
+ 	mutex_unlock(&fpc1020->lock);
++
+ 	return rc;
+ }
+ 
+-static ssize_t spi_prepare_set(struct device *dev,
++/**
++ * sysfs node to enable/disable (power up/power down) the touch sensor
++ *
++ * @see device_prepare
++ */
++static ssize_t device_prepare_set(struct device *dev,
+ 	struct device_attribute *attr, const char *buf, size_t count)
+ {
+ 	int rc;
+-	struct  fpc1020_data *fpc1020 = dev_get_drvdata(dev);
++	struct fpc1020_data *fpc1020 = dev_get_drvdata(dev);
+ 
+ 	if (!strncmp(buf, "enable", strlen("enable")))
+ 		rc = device_prepare(fpc1020, true);
+@@ -531,9 +364,10 @@ static ssize_t spi_prepare_set(struct device *dev,
+ 		rc = device_prepare(fpc1020, false);
+ 	else
+ 		return -EINVAL;
++
+ 	return rc ? rc : count;
+ }
+-static DEVICE_ATTR(spi_prepare, S_IWUSR, NULL, spi_prepare_set);
++static DEVICE_ATTR(device_prepare, S_IWUSR, NULL, device_prepare_set);
+ 
+ /**
+  * sysfs node for controlling whether the driver is allowed
+@@ -542,66 +376,93 @@ static DEVICE_ATTR(spi_prepare, S_IWUSR, NULL, spi_prepare_set);
+ static ssize_t wakeup_enable_set(struct device *dev,
+ 	struct device_attribute *attr, const char *buf, size_t count)
+ {
+-	struct  fpc1020_data *fpc1020 = dev_get_drvdata(dev);
++	struct fpc1020_data *fpc1020 = dev_get_drvdata(dev);
++	ssize_t ret = count;
+ 
++	mutex_lock(&fpc1020->lock);
+ 	if (!strncmp(buf, "enable", strlen("enable")))
+-	{
+-		fpc1020->wakeup_enabled = true;
+-		smp_wmb();
+-	}
++		atomic_set(&fpc1020->wakeup_enabled, 1);
+ 	else if (!strncmp(buf, "disable", strlen("disable")))
+-	{
+-		fpc1020->wakeup_enabled = false;
+-		smp_wmb();
+-	}
++		atomic_set(&fpc1020->wakeup_enabled, 0);
+ 	else
+-		return -EINVAL;
++		ret = -EINVAL;
++	mutex_unlock(&fpc1020->lock);
+ 
+-	return count;
++	return ret;
+ }
+ static DEVICE_ATTR(wakeup_enable, S_IWUSR, NULL, wakeup_enable_set);
+ 
+-
+ /**
+  * sysf node to check the interrupt status of the sensor, the interrupt
+  * handler should perform sysf_notify to allow userland to poll the node.
+  */
+-static ssize_t irq_get(struct device* device,
+-			     struct device_attribute* attribute,
+-			     char* buffer)
++static ssize_t irq_get(struct device *dev,
++	struct device_attribute *attr,
++	char *buf)
+ {
+-	struct fpc1020_data* fpc1020 = dev_get_drvdata(device);
++	struct fpc1020_data *fpc1020 = dev_get_drvdata(dev);
+ 	int irq = gpio_get_value(fpc1020->irq_gpio);
+-	return scnprintf(buffer, PAGE_SIZE, "%i\n", irq);
++
++	return scnprintf(buf, PAGE_SIZE, "%i\n", irq);
+ }
+ 
++static void config_irq(struct fpc1020_data *fpc1020, bool enabled)
++{
++	if (enabled != fpc1020->irq_enabled) {
++		if (enabled)
++			enable_irq(gpio_to_irq(fpc1020->irq_gpio));
++		else
++			disable_irq(gpio_to_irq(fpc1020->irq_gpio));
++
++		fpc1020->irq_enabled = enabled;
++	}
++}
+ 
+ /**
+  * writing to the irq node will just drop a printk message
+  * and return success, used for latency measurement.
+  */
+-static ssize_t irq_ack(struct device* device,
+-			     struct device_attribute* attribute,
+-			     const char* buffer, size_t count)
++static ssize_t irq_ack(struct device *dev,
++	struct device_attribute *attr,
++	const char *buf, size_t count)
+ {
+-	struct fpc1020_data* fpc1020 = dev_get_drvdata(device);
++	struct fpc1020_data *fpc1020 = dev_get_drvdata(dev);
++
+ 	dev_dbg(fpc1020->dev, "%s\n", __func__);
++
+ 	return count;
+ }
+-
+ static DEVICE_ATTR(irq, S_IRUSR | S_IWUSR, irq_get, irq_ack);
+ 
++static ssize_t proximity_state_set(struct device *dev,
++		struct device_attribute *attr, const char *buf, size_t count)
++{
++	struct fpc1020_data *fpc1020 = dev_get_drvdata(dev);
++	int rc, val;
++	rc = kstrtoint(buf, 10, &val);
++	if (rc)
++		return -EINVAL;
++
++	fpc1020->proximity_state = !!val;
++	if (!fpc1020->screen_on) {
++		if (fpc1020->proximity_state)
++			config_irq(fpc1020, false);
++		else
++			config_irq(fpc1020, true);
++	}
++	return count;
++}
++static DEVICE_ATTR(proximity_state, S_IWUSR, NULL, proximity_state_set);
++
+ static struct attribute *attributes[] = {
+ 	&dev_attr_pinctl_set.attr,
+-	&dev_attr_spi_owner.attr,
+-	&dev_attr_spi_prepare.attr,
+-	&dev_attr_fabric_vote.attr,
++	&dev_attr_device_prepare.attr,
+ 	&dev_attr_regulator_enable.attr,
+-	&dev_attr_bus_lock.attr,
+ 	&dev_attr_hw_reset.attr,
+ 	&dev_attr_wakeup_enable.attr,
+ 	&dev_attr_clk_enable.attr,
+ 	&dev_attr_irq.attr,
++	&dev_attr_proximity_state.attr,
+ 	NULL
+ };
+ 
+@@ -612,52 +473,102 @@ static const struct attribute_group attribute_group = {
+ static irqreturn_t fpc1020_irq_handler(int irq, void *handle)
+ {
+ 	struct fpc1020_data *fpc1020 = handle;
+-	dev_dbg(fpc1020->dev, "%s\n", __func__);
+ 
+-	/* Make sure 'wakeup_enabled' is updated before using it
+-	** since this is interrupt context (other thread...) */
+-	smp_rmb();
++	dev_dbg(fpc1020->dev, "%s\n", __func__);
+ 
+-	if (fpc1020->wakeup_enabled ) {
+-		wake_lock_timeout(&fpc1020->ttw_wl, msecs_to_jiffies(FPC_TTW_HOLD_TIME));
++	if (atomic_read(&fpc1020->wakeup_enabled)) {
++		pm_wakeup_event(fpc1020->dev,
++					msecs_to_jiffies(FPC_TTW_HOLD_TIME));
+ 	}
+ 
+-	sysfs_notify(&fpc1020->dev->kobj, NULL, dev_attr_irq.attr.name);
++	sysfs_notify(&fpc1020->input->dev.kobj, NULL, dev_attr_irq.attr.name);
+ 
+ 	return IRQ_HANDLED;
+ }
+ 
+ static int fpc1020_request_named_gpio(struct fpc1020_data *fpc1020,
+-		const char *label, int *gpio)
++	const char *label, int *gpio)
+ {
+ 	struct device *dev = fpc1020->dev;
+ 	struct device_node *np = dev->of_node;
+ 	int rc = of_get_named_gpio(np, label, 0);
++
+ 	if (rc < 0) {
+ 		dev_err(dev, "failed to get '%s'\n", label);
+ 		return rc;
+ 	}
+ 	*gpio = rc;
++
+ 	rc = devm_gpio_request(dev, *gpio, label);
+ 	if (rc) {
+ 		dev_err(dev, "failed to request gpio %d\n", *gpio);
+ 		return rc;
+ 	}
+ 	dev_dbg(dev, "%s %d\n", label, *gpio);
++
++	return 0;
++}
++
++static void set_fingerprintd_nice(int nice)
++{
++	struct task_struct *p;
++
++	read_lock(&tasklist_lock);
++	for_each_process(p) {
++		if (!memcmp(p->comm, "fingerprint@2.1", 16)) {
++			pr_info("%s nice changed to %i\n", p->comm, nice);
++			set_user_nice(p, nice);
++			break;
++		}
++	}
++	read_unlock(&tasklist_lock);
++}
++
++static void fpc1020_suspend_resume(struct work_struct *work)
++{
++	struct fpc1020_data *fpc1020 =
++		container_of(work, typeof(*fpc1020), pm_work);
++
++	/* Escalate fingerprintd priority when screen is off */
++	if (!fpc1020->screen_on)
++		set_fingerprintd_nice(-1);
++	else
++		set_fingerprintd_nice(0);
++
++	config_irq(fpc1020, true);
++}
++
++static int fb_notifier_callback(struct notifier_block *self,
++		unsigned long event, void *data)
++{
++	int *blank;
++	struct fb_event *evdata = data;
++
++	struct fpc1020_data *fpc1020 = container_of(self, struct fpc1020_data, fb_notif);
++	blank = evdata->data;
++	if (evdata && evdata->data && event == FB_EVENT_BLANK && fpc1020) {
++		blank = evdata->data;
++		if (*blank == FB_BLANK_UNBLANK) {
++			fpc1020->screen_on = 1;
++			queue_work(fpc1020->fpc1020_wq, &fpc1020->pm_work);
++		} else if (*blank == FB_BLANK_POWERDOWN) {
++			fpc1020->screen_on = 0;
++			queue_work(fpc1020->fpc1020_wq, &fpc1020->pm_work);
++		}
++	}
+ 	return 0;
+ }
+ 
+-static int fpc1020_probe(struct spi_device *spi)
++static int fpc1020_probe(struct platform_device *pdev)
+ {
+-	struct device *dev = &spi->dev;
++	struct device *dev = &pdev->dev;
+ 	int rc = 0;
+ 	size_t i;
+ 	int irqf;
+ 	struct device_node *np = dev->of_node;
+-	u32 val;
+-
+ 	struct fpc1020_data *fpc1020 = devm_kzalloc(dev, sizeof(*fpc1020),
+ 			GFP_KERNEL);
++
+ 	if (!fpc1020) {
+ 		dev_err(dev,
+ 			"failed to allocate memory for struct fpc1020_data\n");
+@@ -666,8 +577,7 @@ static int fpc1020_probe(struct spi_device *spi)
+ 	}
+ 
+ 	fpc1020->dev = dev;
+-	dev_set_drvdata(dev, fpc1020);
+-	fpc1020->spi = spi;
++	platform_set_drvdata(pdev, fpc1020);
+ 
+ 	if (!np) {
+ 		dev_err(dev, "no of node found\n");
+@@ -677,44 +587,18 @@ static int fpc1020_probe(struct spi_device *spi)
+ 
+ 	rc = fpc1020_request_named_gpio(fpc1020, "fpc,gpio_irq",
+ 			&fpc1020->irq_gpio);
+-	if (rc)
+-		goto exit;
+-	rc = fpc1020_request_named_gpio(fpc1020, "fpc,gpio_cs0",
+-			&fpc1020->cs0_gpio);
+-	if (rc)
+-		goto exit;
+-/*
+-	rc = fpc1020_request_named_gpio(fpc1020, "fpc,gpio_cs1",
+-			&fpc1020->cs1_gpio);
+-	if (rc)
++	if (rc) {
++		dev_err(fpc1020->dev,
++			"fpc1020_request_named_gpio fpc,gpio_irqfailed.\n");
+ 		goto exit;
+-*/
++	}
+ 	rc = fpc1020_request_named_gpio(fpc1020, "fpc,gpio_rst",
+ 			&fpc1020->rst_gpio);
+-	if (rc)
+-		goto exit;
+-
+-	fpc1020->iface_clk = clk_get(dev, "iface_clk");
+-	if (IS_ERR(fpc1020->iface_clk)) {
+-		dev_err(dev, "%s: Failed to get iface_clk\n", __func__);
+-		rc = -EINVAL;
+-		goto exit;
+-	}
+-
+-	fpc1020->core_clk = clk_get(dev, "core_clk");
+-	if (IS_ERR(fpc1020->core_clk)) {
+-		dev_err(dev, "%s: Failed to get core_clk\n", __func__);
+-		rc = -EINVAL;
+-		goto exit;
+-	}
+-
+-	rc = of_property_read_u32(np, "spi-qup-id", &val);
+-	if (rc < 0) {
+-		dev_err(dev, "spi-qup-id not found\n");
++	if (rc) {
++		dev_err(fpc1020->dev,
++			"fpc1020_request_named_gpio fpc,gpio_rst failed.\n");
+ 		goto exit;
+ 	}
+-	fpc1020->qup_id = val;
+-	dev_dbg(dev, "spi-qup-id %d\n", fpc1020->qup_id);
+ 
+ 	fpc1020->fingerprint_pinctrl = devm_pinctrl_get(dev);
+ 	if (IS_ERR(fpc1020->fingerprint_pinctrl)) {
+@@ -743,34 +627,44 @@ static int fpc1020_probe(struct spi_device *spi)
+ 	}
+ 
+ 	rc = select_pin_ctl(fpc1020, "fpc1020_reset_reset");
+-	if (rc)
+-		goto exit;
+-	rc = select_pin_ctl(fpc1020, "fpc1020_cs_low");
+-	if (rc)
++	if (rc) {
++		dev_err(fpc1020->dev,
++			"select_pin_ctl fpc1020_reset_reset failed.\n");
+ 		goto exit;
++	}
+ 	rc = select_pin_ctl(fpc1020, "fpc1020_irq_active");
+-	if (rc)
++	if (rc) {
++		dev_err(fpc1020->dev,
++			"select_pin_ctl fpc1020_irq_active failed.\n");
+ 		goto exit;
++	}
+ 
+-//	rc = select_pin_ctl(fpc1020, "fpc1020_spi_active");
+-	if (rc)
+-		goto exit;
++	atomic_set(&fpc1020->wakeup_enabled, 0);
+ 
+-	fpc1020->wakeup_enabled = false;
+-	fpc1020->clocks_enabled = false;
+-	fpc1020->clocks_suspended = false;
+ 	irqf = IRQF_TRIGGER_RISING | IRQF_ONESHOT;
+-
+-	/* Although wakeup feature is desirable, it is doomed that the device will be
+-	 * woken up due to false interrupt caused by hw reset.
+-	 * As a proactive measure, disable the wakeup feature until further notice.*/
+-#ifdef ENABLE_WAKEUP
+ 	if (of_property_read_bool(dev->of_node, "fpc,enable-wakeup")) {
+ 		irqf |= IRQF_NO_SUSPEND;
+-		dev_info(&spi->dev, "%s enable-wakeup \n",__func__);
+ 		device_init_wakeup(dev, 1);
+ 	}
+-#endif
++
++	/* register input device */
++	fpc1020->input = input_allocate_device();
++	if(!fpc1020->input) {
++		dev_err(dev, "input_allocate_deivce failed.");
++		goto exit;
++	}
++
++	fpc1020->input->name = "fingerprint";
++	fpc1020->input->dev.init_name = "lge_fingerprint";
++
++	input_set_drvdata(fpc1020->input, fpc1020);
++	rc = input_register_device(fpc1020->input);
++	if(rc) {
++		dev_err(dev, "input_register_device failed.");
++		input_free_device(fpc1020->input);
++		goto exit;
++	}
++  
+ 	mutex_init(&fpc1020->lock);
+ 	rc = devm_request_threaded_irq(dev, gpio_to_irq(fpc1020->irq_gpio),
+ 			NULL, fpc1020_irq_handler, irqf,
+@@ -780,17 +674,14 @@ static int fpc1020_probe(struct spi_device *spi)
+ 				gpio_to_irq(fpc1020->irq_gpio));
+ 		goto exit;
+ 	}
++
+ 	dev_dbg(dev, "requested irq %d\n", gpio_to_irq(fpc1020->irq_gpio));
+ 
+-#ifdef ENABLE_WAKEUP
+ 	/* Request that the interrupt should be wakeable */
+-	if (of_property_read_bool(dev->of_node, "fpc,enable-wakeup")) {
+-		enable_irq_wake( gpio_to_irq( fpc1020->irq_gpio ) );
+-	}
+-#endif
+-	wake_lock_init(&fpc1020->ttw_wl, WAKE_LOCK_SUSPEND, "fpc_ttw_wl");
++	enable_irq_wake(gpio_to_irq(fpc1020->irq_gpio));
+ 
+-	rc = sysfs_create_group(&dev->kobj, &attribute_group);
++	/* create sysfs grou under virtual input*/
++	rc = sysfs_create_group(&fpc1020->input->dev.kobj, &attribute_group);
+ 	if (rc) {
+ 		dev_err(dev, "could not create sysfs\n");
+ 		goto exit;
+@@ -799,112 +690,80 @@ static int fpc1020_probe(struct spi_device *spi)
+ 	if (of_property_read_bool(dev->of_node, "fpc,enable-on-boot")) {
+ 		dev_info(dev, "Enabling hardware\n");
+ 		(void)device_prepare(fpc1020, true);
+-//		(void)set_clks(fpc1020, false);
+ 	}
+ 
++	fpc1020->fpc1020_wq = alloc_workqueue("fpc1020_wq", WQ_HIGHPRI, 1);
++	if (!fpc1020->fpc1020_wq) {
++		pr_err("Create input workqueue failed\n");
++		goto exit;
++	}
++
++	INIT_WORK(&fpc1020->pm_work, fpc1020_suspend_resume);
++
++	rc = hw_reset(fpc1020);
++
++	fpc1020->fb_notif.notifier_call = fb_notifier_callback;
++	fpc1020->fb_notif.priority = INT_MAX;
++	rc = fb_register_client(&fpc1020->fb_notif);
++	if (rc) {
++		pr_err("Unable to register fb_notifier : %d\n", rc);
++		goto exit;
++	}
++
++	device_init_wakeup(dev, true);
++
+ 	dev_info(dev, "%s: ok\n", __func__);
++
+ exit:
+ 	return rc;
+ }
+ 
+-static int fpc1020_remove(struct spi_device *spi)
++static int fpc1020_remove(struct platform_device *pdev)
+ {
+-	struct  fpc1020_data *fpc1020 = dev_get_drvdata(&spi->dev);
++	struct fpc1020_data *fpc1020 = platform_get_drvdata(pdev);
+ 
+-	sysfs_remove_group(&spi->dev.kobj, &attribute_group);
++	sysfs_remove_group(&fpc1020->input->dev.kobj, &attribute_group);
+ 	mutex_destroy(&fpc1020->lock);
+-	wake_lock_destroy(&fpc1020->ttw_wl);
++	(void)vreg_setup(fpc1020, "vdd_ana", false);
+ 	(void)vreg_setup(fpc1020, "vdd_io", false);
+-//	(void)vreg_setup(fpc1020, "vcc_spi", false);
+-//	(void)vreg_setup(fpc1020, "vdd_ana", false);
+-	dev_info(&spi->dev, "%s\n", __func__);
+-	return 0;
+-}
+-
+-static int fpc1020_suspend(struct spi_device *spi, pm_message_t mesg)
+-{
+-	struct fpc1020_data *fpc1020 = dev_get_drvdata(&spi->dev);
+-	struct device *dev = &spi->dev;
+-//	fpc1020->clocks_suspended = fpc1020->clocks_enabled;
+-	if (of_property_read_bool(dev->of_node, "fpc,enable-wakeup")) {
+-		dev_info(&spi->dev, "%s do nothing\n",__func__);
+-	} else {
+-		select_pin_ctl(fpc1020, "fpc1020_reset_reset");
+-		(void)vreg_setup(fpc1020, "vdd_io", false);
+-		disable_irq( gpio_to_irq( fpc1020->irq_gpio ));
+-#ifdef HW240_TEMP_WA
+-		devm_free_irq(dev, gpio_to_irq(fpc1020->irq_gpio), fpc1020);
+-#endif
+-	}
+-//	set_clks(fpc1020, false);
+-	return 0;
+-}
++	(void)vreg_setup(fpc1020, "vcc_spi", false);
++	dev_info(&pdev->dev, "%s\n", __func__);
+ 
+-static int fpc1020_resume(struct spi_device *spi)
+-{
+-	struct fpc1020_data *fpc1020 = dev_get_drvdata(&spi->dev);
+-
+-#ifdef HW240_TEMP_WA
+-	int rc = 0;
+-	int irqf;
+-	struct device *dev = &spi->dev;
+-#endif
+-	if (of_property_read_bool(dev->of_node, "fpc,enable-wakeup")) {
+-		dev_info(&spi->dev, "%s do nothing\n",__func__);
+-	} else {
+-		(void)vreg_setup(fpc1020, "vdd_io", true);
+-		hw_reset(fpc1020);
+-#ifdef HW240_TEMP_WA
+-		irqf = IRQF_TRIGGER_RISING | IRQF_ONESHOT;
+-		rc = devm_request_threaded_irq(dev, gpio_to_irq(fpc1020->irq_gpio),
+-				NULL, fpc1020_irq_handler, irqf,
+-				dev_name(dev), fpc1020);
+-		if (rc) {
+-			dev_err(dev, "could not request irq %d\n",
+-					gpio_to_irq(fpc1020->irq_gpio));
+-		}
+-		dev_dbg(dev, "requested irq %d\n", gpio_to_irq(fpc1020->irq_gpio));
+-#else
+-		enable_irq( gpio_to_irq( fpc1020->irq_gpio ));
+-#endif
+-	}
+-//	if (fpc1020->clocks_suspended)
+-//		set_clks(fpc1020, true);
+ 	return 0;
+ }
+ 
+-static struct of_device_id fpc1020_of_match[] = {
++static const struct of_device_id fpc1020_of_match[] = {
+ 	{ .compatible = "fpc,fpc1020", },
+ 	{}
+ };
+ MODULE_DEVICE_TABLE(of, fpc1020_of_match);
+ 
+-static struct spi_driver fpc1020_driver = {
++static struct platform_driver fpc1020_driver = {
+ 	.driver = {
+ 		.name	= "fpc1020",
+ 		.owner	= THIS_MODULE,
+ 		.of_match_table = fpc1020_of_match,
+ 	},
+-	.probe		= fpc1020_probe,
+-	.remove		= fpc1020_remove,
+-	.suspend	= fpc1020_suspend,
+-	.resume		= fpc1020_resume,
++	.probe	= fpc1020_probe,
++	.remove	= fpc1020_remove,
+ };
+ 
+ static int __init fpc1020_init(void)
+ {
+-	int rc = spi_register_driver(&fpc1020_driver);
++	int rc = platform_driver_register(&fpc1020_driver);
++
+ 	if (!rc)
+ 		pr_info("%s OK\n", __func__);
+ 	else
+ 		pr_err("%s %d\n", __func__, rc);
++
+ 	return rc;
+ }
+ 
+ static void __exit fpc1020_exit(void)
+ {
+ 	pr_info("%s\n", __func__);
+-	spi_unregister_driver(&fpc1020_driver);
++	platform_driver_unregister(&fpc1020_driver);
+ }
+ 
+ module_init(fpc1020_init);
+diff --git a/drivers/input/fingerprint/fpc_btp.c b/drivers/input/fingerprint/fpc_btp.c
+deleted file mode 100644
+index 60b5fafed421..000000000000
+--- a/drivers/input/fingerprint/fpc_btp.c
++++ /dev/null
+@@ -1,1550 +0,0 @@
+-/* FPC1021a Area sensor driver
+- *
+- * Copyright (c) 2013 Fingerprint Cards AB <tech@fingerprints.com>
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License Version 2
+- * as published by the Free Software Foundation.
+- */
+-
+-#include <linux/init.h>
+-#include <linux/module.h>
+-#include <linux/kernel.h>
+-#include <linux/device.h>
+-
+-#include <linux/platform_device.h>
+-
+-#include <linux/fs.h>
+-#include <linux/cdev.h>
+-#include <linux/gpio.h>
+-#include <linux/delay.h>
+-#include <linux/interrupt.h>
+-#include <linux/wait.h>
+-#include <linux/kthread.h>
+-#include <linux/poll.h>
+-#include <linux/ioctl.h>
+-#include <linux/types.h>
+-#ifdef CONFIG_OF
+-#include <linux/of_gpio.h>
+-#include <linux/fs.h>
+-#include <linux/of.h>
+-#endif
+-
+-#include <linux/input.h>
+-#include <linux/clk.h>
+-#include <linux/clk/msm-clk.h>
+-#include <linux/irqchip/msm-gpio-irq.h>
+-#include <linux/irqchip/msm-mpm-irq.h>
+-#include <linux/err.h>
+-#include <linux/input.h>
+-#include <linux/mutex.h>
+-#include <linux/regulator/consumer.h>
+-#include <linux/wakelock.h>
+-#include <linux/jiffies.h>
+-#include "qseecom_kernel.h"
+-#include <soc/qcom/scm.h>
+-
+-#include "fpc_btp.h"
+-#include "fpc_btp_regs.h"
+-#include "fpc_log.h"
+-
+-#define INTERRUPT_INPUT_REPORT
+-
+-/* #define FEATURE_FPC_USE_XO */
+-/* #define FEATURE_FPC_USE_PINCTRL */
+-
+-#ifdef FEATURE_FPC_USE_PINCTRL
+-#include <linux/pinctrl/consumer.h>
+-#endif
+-
+-#if defined(SUPPORT_TRUSTZONE)
+-#include <soc/qcom/scm.h>
+-#endif
+-
+-MODULE_LICENSE("GPL");
+-MODULE_AUTHOR("Fingerprint Cards AB <tech@fingerprints.com>");
+-MODULE_DESCRIPTION("FPC_BTP area sensor driver.");
+-
+-/* -------------------------------------------------------------------- */
+-/* fpc_btp data types                                                   */
+-/* -------------------------------------------------------------------- */
+-struct fpc_test_result {
+-	int  pass;
+-	int  value;
+-};
+-
+-struct fpc_btp_data_t {
+-	struct device          *dev;
+-	struct input_dev       *input;
+-	u32                    cs_gpio;
+-	u32                    reset_gpio;
+-	u32                    ldo_en;
+-	u32                    irq_gpio;
+-	u32                    qup_id;
+-	int                    irq;
+-	int		       pipe_owner;
+-	int                    select_checkerboard;
+-	int                    testmode;
+-	struct qseecom_handle  *qseecom_handle;
+-	struct mutex           mutex;
+-
+-	/* factory result */
+-	struct fpc_test_result spi_result;
+-	struct fpc_test_result zone_result;
+-	struct fpc_test_result checkerbd_result;
+-	struct fpc_test_result rubber_result;
+-	bool                   power_on;
+-	struct fpc_btp_platform_data *platform_pdata;
+-	struct wake_lock       cmd_wake_lock;
+-};
+-
+-#pragma pack(push, fpc, 1)
+-struct fpc_btp_qseecom_req {
+-	u32 cmd_id;
+-	u32 data;
+-	u32 data2;
+-	u32 len;
+-	u32 start_pkt;
+-	u32 end_pkt;
+-	u32 test_buf_size;
+-};
+-
+-struct fpc_btp_qseecom_resp {
+-	int32_t data;
+-	int32_t status;
+-};
+-#pragma pack(pop, fpc)
+-
+-
+-/* -------------------------------------------------------------------- */
+-/* fpc_btp driver constants                                             */
+-/* -------------------------------------------------------------------- */
+-#define FPC_BTP_HWID_A           0x022a
+-#define FPC_BTP_HWID_B           0x0111
+-
+-#define FPC_BTP_DEV_NAME         "btp"
+-#define FPC_BTP_RESET_RETRIES    2
+-
+-#define FPC_BTP_SUPPLY_1V8       1800000UL
+-#define FPC_BTP_VOLTAGE_MIN      FPC_BTP_SUPPLY_1V8
+-#define FPC_BTP_VOLTAGE_MAX      FPC_BTP_SUPPLY_1V8
+-#define FPC_BTP_LOAD_UA          7000
+-
+-
+-#define FPC_BTP_TESTMODE_ENABLE                 1
+-#define FPC_BTP_TESTMODE_DISABLE                0
+-#define FPC_BTP_TEST_RESULT_FAIL                (-1)
+-#define FPC_BTP_TEST_RESULT_PASS                0
+-#define FPC_BTP_TEST_INVALID                    (-1)
+-
+-/* qseecom cmd */
+-#define CLIENT_CMD_STARTUP                       10000
+-#define CLIENT_CMD_SHUTDOWN                      10001
+-
+-/* predefined cmd with tz app */
+-#define CLIENT_CMD_WAIT_FINGER                   0
+-#define CLIENT_CMD_SLEEP_SENSOR                  1
+-
+-#define CLIENT_CMD_SPI_TEST                      100
+-#define CLIENT_CMD_ZONE_TEST                     101
+-#define CLIENT_CMD_CHECKERBOARD_TEST             102
+-#define CLIENT_CMD_RUBBER_TEST                   103
+-#define CLIENT_CMD_GET_FINGER_COUNT              104
+-#define CLIENT_CMD_SET_HW_REVISION               1000
+-#define CLIENT_CMD_SET_QUP_ID                    1001
+-
+-
+-#define QSEECOM_SBUFF_SIZE                       64*10
+-#define FPC_TZAPP_NAME                           "csfp_app"
+-
+-#define TZ_BLSP_MODIFY_OWNERSHIP_ID		3
+-#define AC_TZ					1
+-#define AC_HLOS					3
+-#ifdef INTERRUPT_INPUT_REPORT
+-#define FPC_BTP_INTERRUPT                        REL_MISC
+-#endif
+-
+-/* -------------------------------------------------------------------- */
+-/* function prototypes                                                  */
+-/* -------------------------------------------------------------------- */
+-
+-static int __init fpc_btp_init(void);
+-static void __exit fpc_btp_exit(void);
+-static int fpc_btp_probe(struct platform_device *pdev);
+-static int fpc_btp_remove(struct platform_device *spi);
+-static int fpc_btp_suspend(struct device *dev);
+-static int fpc_btp_resume(struct device *dev);
+-
+-static int fpc_btp_cleanup(struct fpc_btp_data_t *fpc_btp,
+-					struct platform_device *spidev);
+-static int fpc_btp_reset_init(struct fpc_btp_data_t *fpc_btp,
+-					struct fpc_btp_platform_data *pdata);
+-static int fpc_btp_ldo_en_init(struct fpc_btp_data_t *fpc_btp,
+-					struct fpc_btp_platform_data *pdata);
+-static int fpc_btp_cs_init(struct fpc_btp_data_t *fpc_btp,
+-					struct fpc_btp_platform_data *pdata);
+-static int fpc_btp_irq_init(struct fpc_btp_data_t *fpc_btp,
+-					struct fpc_btp_platform_data *pdata);
+-static int fpc_btp_get_of_pdata(struct device *dev,
+-					struct fpc_btp_platform_data *pdata);
+-static int fpc_btp_gpio_reset(struct fpc_btp_data_t *fpc_btp);
+-static int fpc_btp_sleep(struct fpc_btp_data_t *fpc_btp, bool deep_sleep);
+-static irqreturn_t fpc_btp_interrupt(int irq, void *_fpc_btp);
+-static int fpc_btp_regulator_init(struct fpc_btp_data_t *fpc_btp,
+-					struct fpc_btp_platform_data *pdata);
+-static int fpc_btp_regulator_set(struct fpc_btp_data_t *fpc_btp, bool enable);
+-static int fpc_btp_ldo_en_set(struct fpc_btp_data_t *fpc_btp, bool enable); 
+-
+-static int spi_change_pipe_owner(struct fpc_btp_data_t *fpc_btp, bool to_tz);
+-
+-/* -------------------------------------------------------------------- */
+-/* External interface                                                   */
+-/* -------------------------------------------------------------------- */
+-module_init(fpc_btp_init);
+-module_exit(fpc_btp_exit);
+-
+-static const struct dev_pm_ops fpc_btp_pm = {
+-	.suspend = fpc_btp_suspend,
+-	.resume = fpc_btp_resume
+-};
+-
+-#ifdef CONFIG_OF
+-static struct of_device_id fpc_btp_of_match[] = {
+-	{ .compatible = "fpc,btp", },
+-	{}
+-};
+-
+-/* MODULE_DEVICE_TABLE(of, fpc_btp_of_match); */
+-#endif
+-
+-static struct platform_driver fpc_btp_driver = {
+-	.driver = {
+-		.name	= FPC_BTP_DEV_NAME,
+-		.owner	= THIS_MODULE,
+-		.pm     = &fpc_btp_pm,
+-#ifdef CONFIG_OF
+-		.of_match_table = fpc_btp_of_match,
+-#endif
+-	},
+-	.probe	= fpc_btp_probe,
+-	.remove	= fpc_btp_remove,
+-};
+-
+-
+-/* -------------------------------------------------------------------- */
+-/* function definitions                                                 */
+-/* -------------------------------------------------------------------- */
+-static int __init fpc_btp_init(void)
+-{
+-	if (platform_driver_register(&fpc_btp_driver))
+-		return -EINVAL;
+-
+-	return 0;
+-}
+-
+-/* -------------------------------------------------------------------- */
+-static void __exit fpc_btp_exit(void)
+-{
+-	PINFO("enter");
+-
+-	platform_driver_unregister(&fpc_btp_driver);
+-}
+-
+-
+-static void get_cmd_rsp_buffers(struct qseecom_handle *handle,
+-	void **cmd, int *cmd_len, void **resp, int *resp_len)
+-{
+-	*cmd = handle->sbuf;
+-	if (*cmd_len & QSEECOM_ALIGN_MASK)
+-		*cmd_len = QSEECOM_ALIGN(*cmd_len);
+-
+-	*resp = handle->sbuf + *cmd_len;
+-	if (*resp_len & QSEECOM_ALIGN_MASK)
+-		*resp_len = QSEECOM_ALIGN(*resp_len);
+-}
+-
+-
+-static int fpc_btp_qseecom_cmd(struct fpc_btp_data_t *fpc_btp,
+-		u32 cmd, u32 data, struct fpc_test_result *result)
+-{
+-	int res = 0;
+-	struct fpc_btp_qseecom_req *req;
+-	struct fpc_btp_qseecom_resp *resp;
+-	int req_len, resp_len;
+-
+-	mutex_lock(&fpc_btp->mutex);
+-	PINFO("qseecom cmd(%d)", cmd);
+-
+-	if( (cmd != CLIENT_CMD_STARTUP)
+-		&& (cmd != CLIENT_CMD_SHUTDOWN) ) {
+-		if(fpc_btp->qseecom_handle == NULL) {
+-			PINFO("qseecom handle is NULL!!");
+-			res = -1;
+-			goto unlock;
+-		}
+-	}
+-
+-	switch(cmd) {
+-	case CLIENT_CMD_STARTUP:
+-		if(fpc_btp->qseecom_handle != NULL) {
+-			PINFO("already opened qseecom");
+-			res = 0;
+-			goto unlock;
+-		}
+-		res = qseecom_start_app(&fpc_btp->qseecom_handle,
+-				FPC_TZAPP_NAME, QSEECOM_SBUFF_SIZE);
+-		break;
+-
+-	case CLIENT_CMD_SHUTDOWN:
+-		if(fpc_btp->qseecom_handle == NULL) {
+-			PINFO("qseecom handle is NULL!!");
+-			res = 0;
+-			goto unlock;
+-		}
+-		res = qseecom_shutdown_app(&fpc_btp->qseecom_handle);
+-		break;
+-
+-	case CLIENT_CMD_SPI_TEST:
+-	case CLIENT_CMD_ZONE_TEST:
+-	case CLIENT_CMD_CHECKERBOARD_TEST:
+-	case CLIENT_CMD_RUBBER_TEST:
+-	case CLIENT_CMD_SET_HW_REVISION:
+-	case CLIENT_CMD_SET_QUP_ID:
+-	case CLIENT_CMD_WAIT_FINGER:
+-	case CLIENT_CMD_GET_FINGER_COUNT:
+-		if(result == NULL) {
+-			PERR("response buf null");
+-			goto unlock;
+-		}
+-		req_len = sizeof(struct fpc_btp_qseecom_req);
+-		resp_len = sizeof(struct fpc_btp_qseecom_resp);
+-		get_cmd_rsp_buffers(fpc_btp->qseecom_handle,
+-				(void **)&req, &req_len,
+-				(void **)&resp, &resp_len);
+-		req->cmd_id = cmd;
+-		req->data = data;
+-
+-		res = qseecom_send_command(fpc_btp->qseecom_handle,
+-				(void *)req, req_len,
+-				(void *)resp, resp_len);
+-		if(res < 0) {
+-			PERR("cmd(%d) qseecom fail", cmd);
+-			goto unlock;
+-		}
+-		result->value = resp->data;
+-		result->pass = resp->status;
+-		break;
+-
+-	default:
+-		PERR("not suppport cmd(%d)!!", cmd);
+-		res = -1;
+-		break;
+-	}
+-
+-unlock:
+-	mutex_unlock(&fpc_btp->mutex);
+-	return res;
+-}
+-
+-
+-/* -------------------------------------------------------------------- */
+-static int fpc_btp_testmode_enable(struct fpc_btp_data_t *fpc_btp)
+-{
+-	int res;
+-
+-	/* Start the TZ app */
+-	res = fpc_btp_qseecom_cmd(fpc_btp, CLIENT_CMD_STARTUP, 0, NULL);
+-	if (res < 0) {
+-		PERR("startup fail!!");
+-		return res;
+-	}
+-	fpc_btp->testmode = 1;
+-	PINFO("startup success!!");
+-
+-	return res;
+-}
+-
+-static int fpc_btp_testmode_disable(struct fpc_btp_data_t *fpc_btp)
+-{
+-	int res;
+-
+-	/* shutdown the TZ app */
+-	res = fpc_btp_qseecom_cmd(fpc_btp, CLIENT_CMD_SHUTDOWN, 0, NULL);
+-	if (res < 0) {
+-		PERR("shutdown fail!!");
+-		return res;
+-	}
+-	fpc_btp->qseecom_handle = NULL;
+-	fpc_btp->testmode = 0;
+-
+-	PERR("shutdown success!!");
+-
+-	return res;
+-}
+-
+-/* -------------------------------------------------------------------- */
+-static ssize_t fpc_btp_store_spitest(struct device *dev,
+-		struct device_attribute *attr, const char *buf, size_t count)
+-{
+-	int error = 0;
+-	struct fpc_btp_data_t *fpc_btp = dev_get_drvdata(dev);
+-
+-	PINFO("start spi test");
+-
+-	fpc_btp->spi_result.pass = FPC_BTP_TEST_RESULT_FAIL;
+-	fpc_btp->spi_result.value = FPC_BTP_TEST_INVALID;
+-
+-	if(!fpc_btp->testmode) {
+-		PERR("not test mode");
+-		return count;
+-	}
+-
+-	error = fpc_btp_qseecom_cmd(fpc_btp, CLIENT_CMD_SPI_TEST,
+-				0, &fpc_btp->spi_result);
+-	if(error) {
+-		PERR("qseecom cmd failed.");
+-		return count;
+-	}
+-
+-	if(fpc_btp->spi_result.pass < 0) {
+-		PERR("spi test failed, status(%d)", fpc_btp->spi_result.pass);
+-		return count;
+-	}
+-
+-	if((fpc_btp->spi_result.value == FPC_BTP_HWID_A)
+-		|| (fpc_btp->spi_result.value == FPC_BTP_HWID_B)){
+-		fpc_btp->spi_result.pass = FPC_BTP_TEST_RESULT_PASS;
+-	}
+-	else {
+-		fpc_btp->spi_result.pass = FPC_BTP_TEST_RESULT_FAIL;
+-		PERR("spi test failed, hwid[0x%x]", fpc_btp->spi_result.value);
+-		return count;
+-	}
+-
+-	PINFO("spi test success, hwid[0x%x]", fpc_btp->spi_result.value);
+-
+-	return count;
+-}
+-
+-
+-static ssize_t fpc_btp_show_spitest(struct device *dev,
+-				   struct device_attribute *attr, char *buf)
+-{
+-	struct fpc_btp_data_t *fpc_btp = dev_get_drvdata(dev);
+-
+-	return sprintf(buf, "%d %d\n", fpc_btp->spi_result.pass,
+-				fpc_btp->spi_result.value);
+-}
+-
+-static DEVICE_ATTR(spitest, S_IRUGO | S_IWUSR,
+-		   fpc_btp_show_spitest, fpc_btp_store_spitest);
+-
+-
+-/* -------------------------------------------------------------------- */
+-static ssize_t fpc_btp_store_zonetest(struct device *dev,
+-		struct device_attribute *attr, const char *buf, size_t count)
+-{
+-	int error = 0;
+-	struct fpc_btp_data_t *fpc_btp = dev_get_drvdata(dev);
+-	unsigned long val = simple_strtoul(buf, NULL, 10);
+-
+-	PINFO("start zone test:%ld", val);
+-	fpc_btp->zone_result.pass = FPC_BTP_TEST_RESULT_FAIL;
+-	fpc_btp->zone_result.value = FPC_BTP_TEST_INVALID;
+-
+-	if(!fpc_btp->testmode) {
+-		PERR("not test mode");
+-		return count;
+-	}
+-
+-	error = fpc_btp_qseecom_cmd(fpc_btp, CLIENT_CMD_ZONE_TEST,
+-					0, &fpc_btp->zone_result);
+-	if(error) {
+-		PERR("qseecom cmd failed");
+-		return count;
+-	}
+-
+-	if(fpc_btp->zone_result.pass < 0) {
+-		PERR("zone test failed, status(%d)", fpc_btp->zone_result.pass);
+-		return count;
+-	}
+-
+-	fpc_btp->zone_result.pass = FPC_BTP_TEST_RESULT_PASS;
+-	PINFO("zone test success, bed pixel count(%d)",
+-				fpc_btp->zone_result.value);
+-
+-	return count;
+-}
+-
+-
+-static ssize_t fpc_btp_show_zonetest(struct device *dev,
+-				   struct device_attribute *attr, char *buf)
+-{
+-	struct fpc_btp_data_t *fpc_btp = dev_get_drvdata(dev);
+-
+-	PINFO("enter");
+-
+-	return sprintf(buf, "%d %d\n", fpc_btp->zone_result.pass,
+-					fpc_btp->zone_result.value);
+-}
+-
+-
+-static DEVICE_ATTR(zonetest, S_IRUGO | S_IWUSR,
+-		   fpc_btp_show_zonetest, fpc_btp_store_zonetest);
+-
+-/* -------------------------------------------------------------------- */
+-static ssize_t fpc_btp_store_checkerbdtest(struct device *dev,
+-		struct device_attribute *attr, const char *buf, size_t count)
+-{
+-	int error = 0;
+-	struct fpc_btp_data_t *fpc_btp = dev_get_drvdata(dev);
+-	unsigned long val = simple_strtoul(buf, NULL, 10);
+-
+-	PINFO("start checkerboard test:%ld", val);
+-	fpc_btp->zone_result.pass = FPC_BTP_TEST_RESULT_FAIL;
+-	fpc_btp->zone_result.value = FPC_BTP_TEST_INVALID;
+-
+-	if(!fpc_btp->testmode) {
+-		PERR("not test mode");
+-		return count;
+-	}
+-
+-	error = fpc_btp_qseecom_cmd(fpc_btp, CLIENT_CMD_CHECKERBOARD_TEST,
+-					0, &fpc_btp->checkerbd_result);
+-	if(error) {
+-		PERR("checkerboard qseecom cmd failed");
+-		return count;
+-	}
+-
+-	if(fpc_btp->checkerbd_result.pass < 0) {
+-		PERR("checkerboard test failed, status(%d)",
+-			fpc_btp->checkerbd_result.pass);
+-		return count;
+-	}
+-
+-	fpc_btp->checkerbd_result.pass = FPC_BTP_TEST_RESULT_PASS;
+-	PINFO("checkerbd test sucess, bed pixel count:%d",
+-			fpc_btp->checkerbd_result.value);
+-
+-	return count;
+-}
+-
+-
+-
+-static ssize_t fpc_btp_show_checkerbdtest(struct device *dev,
+-				   struct device_attribute *attr, char *buf)
+-{
+-	struct fpc_btp_data_t *fpc_btp = dev_get_drvdata(dev);
+-
+-	PINFO("enter");
+-
+-	return sprintf(buf, "%d %d\n", fpc_btp->checkerbd_result.pass,
+-					fpc_btp->checkerbd_result.value);
+-}
+-
+-
+-
+-static DEVICE_ATTR(checkerbdtest, S_IRUGO | S_IWUSR,
+-		   fpc_btp_show_checkerbdtest, fpc_btp_store_checkerbdtest);
+-
+-
+-/* -------------------------------------------------------------------- */
+-static ssize_t fpc_btp_store_testmode(struct device *dev,
+-		struct device_attribute *attr, const char *buf, size_t count)
+-{
+-	struct fpc_btp_data_t *fpc_btp = dev_get_drvdata(dev);
+-	unsigned long val = simple_strtoul(buf, NULL, 10);
+-
+-
+-	PINFO("test mode:%ld", val);
+-
+-
+-	if(val == fpc_btp->testmode) {
+-		return count;
+-	}
+-
+-	if(val==FPC_BTP_TESTMODE_ENABLE) {
+-		PINFO("test mode enable");
+-		fpc_btp_testmode_enable(fpc_btp);
+-	}
+-	else if(val==FPC_BTP_TESTMODE_DISABLE) {
+-		PINFO("test mode disable");
+-		fpc_btp_testmode_disable(fpc_btp);
+-	}
+-	else {
+-		PERR("please check testmode arg[%ld]", val);
+-	}
+-	return count;
+-}
+-
+-
+-static ssize_t fpc_btp_show_testmode(struct device *dev,
+-				   struct device_attribute *attr, char *buf)
+-{
+-	struct fpc_btp_data_t *fpc_btp = dev_get_drvdata(dev);
+-	return sprintf(buf, "%d\n", fpc_btp->testmode);
+-}
+-
+-
+-static DEVICE_ATTR(testmode, S_IRUGO | S_IWUSR,
+-		   fpc_btp_show_testmode, fpc_btp_store_testmode);
+-
+-
+-/* -------------------------------------------------------------------- */
+-static ssize_t fpc_btp_store_qup_id(struct device *dev,
+-		struct device_attribute *attr, const char *buf, size_t count)
+-{
+-	int error = 0;
+-	struct fpc_btp_data_t *fpc_btp = dev_get_drvdata(dev);
+-
+-	PINFO("blsp store");
+-
+-	if(!fpc_btp->testmode) {
+-		PERR("not test mode");
+-		return count;
+-	}
+-
+-	error = fpc_btp_qseecom_cmd(fpc_btp, CLIENT_CMD_SET_QUP_ID,
+-					fpc_btp->qup_id, &fpc_btp->checkerbd_result);
+-	if(error) {
+-		PERR("qseecom cmd failed, cmd(%d)", CLIENT_CMD_SET_QUP_ID);
+-		return count;
+-	}
+-	return count;
+-}
+-
+-
+-static ssize_t fpc_btp_show_qup_id(struct device *dev,
+-				   struct device_attribute *attr, char *buf)
+-{
+-	struct fpc_btp_data_t *fpc_btp = dev_get_drvdata(dev);
+-	return sprintf(buf, "%d\n", fpc_btp->qup_id);
+-}
+-
+-
+-static DEVICE_ATTR(qup_id, S_IRUGO | S_IWUSR,
+-		   fpc_btp_show_qup_id, fpc_btp_store_qup_id);
+-/* -------------------------------------------------------------------- */
+-static ssize_t fpc_btp_store_rubbertest(struct device *dev,
+-		struct device_attribute *attr, const char *buf, size_t count)
+-{
+-	int error = 0;
+-	struct fpc_btp_data_t *fpc_btp = dev_get_drvdata(dev);
+-
+-	fpc_btp->rubber_result.pass = FPC_BTP_TEST_RESULT_FAIL;
+-	fpc_btp->rubber_result.value = FPC_BTP_TEST_INVALID;
+-
+-	PINFO("rubber stamp test");
+-
+-	if(!fpc_btp->testmode) {
+-		PERR("not test mode");
+-		return count;
+-	}
+-
+-	error = fpc_btp_qseecom_cmd(fpc_btp, CLIENT_CMD_RUBBER_TEST,
+-					0, &fpc_btp->rubber_result);
+-	if(error) {
+-		PERR("qseecom cmd failed, rubber test!!");
+-		return count;
+-	}
+-
+-	if(fpc_btp->rubber_result.pass < 0) {
+-		PERR("rubber test failed, status(%d)",
+-			fpc_btp->rubber_result.pass);
+-		return count;
+-	}
+-	fpc_btp->rubber_result.pass = FPC_BTP_TEST_RESULT_PASS;
+-	PINFO("rubber test sucess, point(%d)",
+-			fpc_btp->rubber_result.value);
+-
+-	return count;
+-}
+-
+-
+-static ssize_t fpc_btp_show_rubbertest(struct device *dev,
+-				   struct device_attribute *attr, char *buf)
+-{
+-	struct fpc_btp_data_t *fpc_btp = dev_get_drvdata(dev);
+-
+-	return sprintf(buf, "%d %d\n", fpc_btp->rubber_result.pass,
+-				fpc_btp->rubber_result.value);
+-
+-}
+-
+-
+-static DEVICE_ATTR(rubbertest, S_IRUGO | S_IWUSR,
+-		   fpc_btp_show_rubbertest, fpc_btp_store_rubbertest);
+-
+-
+-/* -------------------------------------------------------------------- */
+-static ssize_t fpc_btp_show_intstatus(struct device *dev,
+-				   struct device_attribute *attr, char *buf)
+-{
+-	return sprintf(buf, "not support\n");
+-}
+-
+-static DEVICE_ATTR(intstatus, S_IRUGO,
+-		   fpc_btp_show_intstatus, NULL);
+-
+-
+-/* -------------------------------------------------------------------- */
+-static ssize_t fpc_btp_store_waitfinger(struct device *dev,
+-		struct device_attribute *attr, const char *buf, size_t count)
+-{
+-	int error = 0;
+-	struct fpc_btp_data_t *fpc_btp = dev_get_drvdata(dev);
+-	struct fpc_test_result result;
+-
+-	result.pass = FPC_BTP_TEST_RESULT_FAIL;
+-	result.value = FPC_BTP_TEST_INVALID;
+-
+-	PINFO("wait finger");
+-
+-	if(!fpc_btp->testmode) {
+-		PERR("not test mode");
+-		return count;
+-	}
+-
+-	error = fpc_btp_qseecom_cmd(fpc_btp, CLIENT_CMD_WAIT_FINGER,
+-					0, &result);
+-	if(error) {
+-		PERR("qseecom cmd failed, wait finger!!");
+-		return count;
+-	}
+-
+-	return count;
+-}
+-
+-
+-static DEVICE_ATTR(waitfinger, S_IWUSR,
+-		   NULL, fpc_btp_store_waitfinger);
+-
+-/* -------------------------------------------------------------------- */
+-static ssize_t fpc_btp_show_fingercount(struct device *dev,
+-				   struct device_attribute *attr, char *buf)
+-{
+-	int error = 0;
+-	struct fpc_btp_data_t *fpc_btp = dev_get_drvdata(dev);
+-	struct fpc_test_result result;
+-
+-	result.pass = FPC_BTP_TEST_RESULT_FAIL;
+-	result.value = FPC_BTP_TEST_INVALID;
+-
+-	PINFO("finger count");
+-
+-	if (!fpc_btp->testmode) {
+-		PERR("not test mode");
+-		return sprintf(buf, "-1 -1\n");
+-	}
+-
+-	error = fpc_btp_qseecom_cmd(fpc_btp, CLIENT_CMD_GET_FINGER_COUNT,
+-					0, &result);
+-	if (error)
+-        PINFO("qseecom cmd failed, wait finger!!");
+-	else
+-        PERR("finger down count:(%d), statsu(%d)", result.value, result.pass);
+-
+-	return sprintf(buf, "%d %d\n", result.pass,
+-				result.value);
+-}
+-
+-static DEVICE_ATTR(fingercount, S_IRUGO,
+-		   fpc_btp_show_fingercount, NULL);
+-
+-/* -------------------------------------------------------------------- */
+-/* -------------------------------------------------------------------- */
+-static ssize_t fpc_btp_store_spi_prepare_set(struct device *dev,
+-	struct device_attribute *attr, const char *buf, size_t count)
+-{
+-	return count;
+-}
+-
+-static ssize_t fpc_btp_show_spi_prepare(struct device *dev,
+-				struct device_attribute *attr, char *buf)
+-{
+-	return sprintf(buf, "0 \n");
+-}
+-
+-static DEVICE_ATTR(spi_prepare, S_IRUGO | S_IWUSR,
+-		fpc_btp_show_spi_prepare, fpc_btp_store_spi_prepare_set);
+-#if 0
+-/* -------------------------------------------------------------------- */
+-static ssize_t fpc_btp_store_regulator(struct device *dev,
+-	struct device_attribute *attr, const char *buf, size_t count)
+-{
+-	struct fpc_btp_data_t *fpc_btp = dev_get_drvdata(dev);
+-	bool enable;
+-
+-	if(*buf == '1')
+-		enable = true;
+-	else
+-		enable = false;
+-
+-	if(fpc_btp_regulator_set(fpc_btp,  enable) < 0)
+-		PERR("regulator (%d) fail", enable);
+-
+-	return count;
+-}
+-
+-static ssize_t fpc_btp_show_regulator(struct device *dev,
+-				struct device_attribute *attr, char *buf)
+-{
+-	struct fpc_btp_data_t *fpc_btp = dev_get_drvdata(dev);
+-
+-	return sprintf(buf, "%d \n", fpc_btp->power_on);
+-}
+-
+-static DEVICE_ATTR(regulator, S_IRUGO | S_IWUSR,
+-		fpc_btp_show_regulator, fpc_btp_store_regulator);
+-
+-/* -------------------------------------------------------------------- */
+-static ssize_t fpc_btp_store_gpio(struct device *dev,
+-	struct device_attribute *attr, const char *buf, size_t count)
+-{
+-	struct fpc_btp_data_t *fpc_btp = dev_get_drvdata(dev);
+-	int error;
+-
+-	if(*buf == '1' && !fpc_btp->power_on) {
+-		error = regulator_enable(fpc_btp->platform_pdata->vreg);
+-		if(error < 0) {
+-			PERR("regulator enable fail");
+-			return count;
+-		}
+-
+-		if((error = fpc_btp_gpio_reset(fpc_btp)))
+-			PERR("reset gpio init fail");
+-
+-		enable_irq(fpc_btp->irq);
+-		fpc_btp->power_on = true;
+-	}
+-	else if(*buf == '0' && fpc_btp->power_on) {
+-		disable_irq(fpc_btp->irq);
+-		gpio_direction_output(fpc_btp->reset_gpio, 0);
+-		error = regulator_disable(fpc_btp->platform_pdata->vreg);
+-		if(error < 0) {
+-			PERR("regulator disable fail");
+-			return count;
+-		}
+-		fpc_btp->power_on = false;
+-	}
+-
+-	return count;
+-}
+-
+-static ssize_t fpc_btp_show_gpio(struct device *dev,
+-				struct device_attribute *attr, char *buf)
+-{
+-	struct fpc_btp_data_t *fpc_btp = dev_get_drvdata(dev);
+-
+-	return sprintf(buf, "%d \n", fpc_btp->power_on);
+-}
+-
+-static DEVICE_ATTR(gpio, S_IRUGO | S_IWUSR,
+-		fpc_btp_show_gpio, fpc_btp_store_gpio);
+-#endif
+-/* -------------------------------------------------------------------- */
+-
+-static struct attribute *fpc_btp_attributes[] = {
+-	&dev_attr_fingercount.attr,
+-	&dev_attr_waitfinger.attr,
+-	&dev_attr_intstatus.attr,
+-	&dev_attr_rubbertest.attr,
+-	&dev_attr_qup_id.attr,
+-	&dev_attr_spi_prepare.attr,
+-	&dev_attr_testmode.attr,
+-	&dev_attr_spitest.attr,
+-	&dev_attr_zonetest.attr,
+-	&dev_attr_checkerbdtest.attr,
+-/*	&dev_attr_regulator.attr,
+-	&dev_attr_gpio.attr,*/
+-	NULL
+-};
+-
+-
+-static const struct attribute_group fpc_btp_attr_group = {
+-	.attrs = fpc_btp_attributes,
+-};
+-
+-
+-/* -------------------------------------------------------------------- */
+-static int fpc_btp_probe(struct platform_device *pdev)
+-{
+-	struct fpc_btp_platform_data *fpc_btp_pdata;
+-	struct device *dev = &pdev->dev;
+-	int error = 0;
+-	struct fpc_btp_data_t *fpc_btp = NULL;
+-
+-	PDEBUG("enter");
+-
+-	fpc_btp = devm_kzalloc(dev, sizeof(*fpc_btp), GFP_KERNEL);
+-	if (!fpc_btp) {
+-		PERR("failed to allocate memory for struct fpc_btp_data");
+-		return -ENOMEM;
+-	}
+-
+-	platform_set_drvdata(pdev, fpc_btp);
+-	fpc_btp->dev = dev;
+-	fpc_btp->reset_gpio = -EINVAL;
+-	fpc_btp->ldo_en     = -EINVAL;
+-	fpc_btp->irq_gpio   = -EINVAL;
+-	fpc_btp->cs_gpio    = -EINVAL;
+-	fpc_btp->irq        = -EINVAL;
+-	fpc_btp->qup_id     = -EINVAL;
+-	fpc_btp->testmode = 0;
+-	fpc_btp->qseecom_handle = NULL;
+-	mutex_init(&fpc_btp->mutex);
+-	wake_lock_init(&fpc_btp->cmd_wake_lock, WAKE_LOCK_SUSPEND, "csfp_wakelock");
+-	fpc_btp->platform_pdata = NULL;
+-
+-	if(pdev->dev.of_node) {
+-		fpc_btp_pdata = devm_kzalloc(dev, sizeof(*fpc_btp_pdata), GFP_KERNEL);
+-		if (!fpc_btp_pdata) {
+-			PERR("Failed to allocate memory");
+-			return -ENOMEM;
+-		}
+-
+-		error = fpc_btp_get_of_pdata(dev, fpc_btp_pdata);
+-		if (error)
+-			goto err;
+-
+-		pdev->dev.platform_data = fpc_btp_pdata;
+-		fpc_btp->platform_pdata = fpc_btp_pdata;
+-
+-	} else {
+-		fpc_btp_pdata = pdev->dev.platform_data;
+-		fpc_btp->platform_pdata = pdev->dev.platform_data;
+-	}
+-
+-	fpc_btp->qup_id = fpc_btp_pdata->qup_id;
+-
+-	if (fpc_btp->platform_pdata->use_regulator) {
+-		if((error = fpc_btp_regulator_init(fpc_btp, fpc_btp_pdata)) < 0)
+-			goto err;
+-
+-		if((error = fpc_btp_regulator_set(fpc_btp, true)))
+-			goto err;
+-	} else {
+-		if((error = fpc_btp_ldo_en_init(fpc_btp, fpc_btp_pdata)))
+-			goto err;
+-
+-		if((error = fpc_btp_ldo_en_set(fpc_btp, true)))
+-			goto err;
+-	}
+-	if((error = fpc_btp_reset_init(fpc_btp, fpc_btp_pdata)))
+-		goto err;
+-
+-	if((error = fpc_btp_cs_init(fpc_btp, fpc_btp_pdata)))
+-		goto err;
+-
+-	if((error = fpc_btp_irq_init(fpc_btp, fpc_btp_pdata)))
+-		goto err;
+-
+-	if((error = fpc_btp_gpio_reset(fpc_btp)))
+-		goto err;
+-
+-
+-	/* register input device */
+-	fpc_btp->input = input_allocate_device();
+-	if(!fpc_btp->input) {
+-		PERR("input_allocate_deivce failed.");
+-		error = -ENOMEM;
+-		goto err;
+-	}
+-
+-	fpc_btp->input->name = "fingerprint";
+-	fpc_btp->input->dev.init_name = "lge_fingerprint";
+-
+-#ifdef INTERRUPT_INPUT_REPORT
+-	input_set_capability(fpc_btp->input, EV_REL, FPC_BTP_INTERRUPT);
+-
+-	error = devm_request_threaded_irq(dev, fpc_btp->irq, NULL,
+-			fpc_btp_interrupt,
+-			IRQF_TRIGGER_RISING | IRQF_ONESHOT,
+-			"fpc_btp", fpc_btp);
+-
+-	if (error) {
+-		PERR("request_irq %i failed.", fpc_btp->irq);
+-		fpc_btp->irq = -EINVAL;
+-		goto err;
+-	}
+-	disable_irq(fpc_btp->irq);
+-	enable_irq(fpc_btp->irq);
+-#endif
+-	input_set_drvdata(fpc_btp->input, fpc_btp);
+-	error = input_register_device(fpc_btp->input);
+-	if(error) {
+-		PERR("input_register_device failed.");
+-		input_free_device(fpc_btp->input);
+-		goto err;
+-	}
+-
+-	if(sysfs_create_group(&fpc_btp->input->dev.kobj, &fpc_btp_attr_group)) {
+-		PERR("sysfs_create_group failed.");
+-		goto err_sysfs;
+-	}
+-
+-	spi_change_pipe_owner(fpc_btp, true);
+-	PINFO("done!!");
+-
+-	return 0;
+-
+-err_sysfs:
+-	input_free_device(fpc_btp->input);
+-	input_unregister_device(fpc_btp->input);
+-
+-err:
+-	mutex_destroy(&fpc_btp->mutex);
+-	fpc_btp_cleanup(fpc_btp, pdev);
+-	return error;
+-}
+-
+-/* -------------------------------------------------------------------- */
+-static int fpc_btp_remove(struct platform_device *pdev)
+-{
+-	struct fpc_btp_data_t *fpc_btp = platform_get_drvdata(pdev);
+-
+-	PINFO("enter");
+-
+-	fpc_btp_sleep(fpc_btp, true);
+-
+-	sysfs_remove_group(&fpc_btp->input->dev.kobj, &fpc_btp_attr_group);
+-	input_free_device(fpc_btp->input);
+-	input_unregister_device(fpc_btp->input);
+-
+-	fpc_btp_cleanup(fpc_btp, pdev);
+-
+-	return 0;
+-}
+-
+-
+-/* -------------------------------------------------------------------- */
+-static int fpc_btp_suspend(struct device *dev)
+-{
+-
+-	struct fpc_btp_data_t *fpc_btp = dev_get_drvdata(dev);
+-
+-	PINFO("enter");
+-
+-	disable_irq(fpc_btp->irq);
+-	gpio_direction_output(fpc_btp->reset_gpio, 0);
+-
+-	if(fpc_btp->platform_pdata->use_regulator) {
+-		if(fpc_btp_regulator_set(fpc_btp, false) < 0)
+-			PERR("reguator off fail");
+-	} else {
+-		if(fpc_btp_ldo_en_set(fpc_btp, false) < 0)
+-			PERR("ldo_en off fail");
+-	}
+-
+-	return 0;
+-}
+-
+-/* -------------------------------------------------------------------- */
+-static int fpc_btp_resume(struct device *dev)
+-{
+-	struct fpc_btp_data_t *fpc_btp = dev_get_drvdata(dev);
+-
+-	PINFO("enter");
+-
+-	if(fpc_btp->platform_pdata->use_regulator) {
+-		if(fpc_btp_regulator_set(fpc_btp, true) < 0)
+-			PERR("reguator on fail");
+-	} else {
+-		if(fpc_btp_ldo_en_set(fpc_btp, true) < 0)
+-			PERR("ldo_en on fail");
+-	}
+-
+-	if(fpc_btp_gpio_reset(fpc_btp))
+-		PINFO("reset gpio init fail");
+-
+-	enable_irq(fpc_btp->irq);
+-
+-	return 0;
+-}
+-
+-/* -------------------------------------------------------------------- */
+-static int
+-fpc_btp_cleanup(struct fpc_btp_data_t *fpc_btp, struct platform_device *pdev)
+-{
+-	PINFO("enter");
+-
+-	wake_lock_destroy(&fpc_btp->cmd_wake_lock);
+-
+-#ifdef INTERRUPT_INPUT_REPORT
+-	if (fpc_btp->irq)
+-		devm_free_irq(&pdev->dev, fpc_btp->irq, fpc_btp);
+-#else
+-	if (fpc_btp->irq)
+-		free_irq(fpc_btp->irq, fpc_btp);
+-#endif
+-	if (gpio_is_valid(fpc_btp->irq_gpio))
+-		gpio_free(fpc_btp->irq_gpio);
+-
+-	if (gpio_is_valid(fpc_btp->reset_gpio))
+-		gpio_free(fpc_btp->reset_gpio);
+-
+-	if (fpc_btp->platform_pdata->use_regulator) {
+-		//regulator_put(fpc_btp->platform_pdata->vreg);
+-	} else {
+-		if (gpio_is_valid(fpc_btp->ldo_en))
+-			gpio_free(fpc_btp->ldo_en);
+-	}
+-
+-	//spi_set_drvdata(spidev, NULL);
+-
+-	return 0;
+-}
+-
+-/* -------------------------------------------------------------------- */
+-static int fpc_btp_ldo_en_init(struct fpc_btp_data_t *fpc_btp,
+-					struct fpc_btp_platform_data *pdata)
+-{
+-	int error = 0;
+-
+-	PINFO("enter");
+-	fpc_btp->power_on = false;
+-
+-	if (gpio_is_valid(pdata->ldo_en)) {
+-
+-		PINFO("Assign HW ldo_en -> GPIO%d",
+-				 pdata->ldo_en);
+-
+-		error = gpio_request(pdata->ldo_en, "fpc_btp_ldo_en");
+-
+-		if (error) {
+-			PERR("gpio_request (ldo_en) failed.");
+-			return error;
+-		}
+-
+-		fpc_btp->ldo_en = pdata->ldo_en;
+-
+-		error = gpio_direction_output(fpc_btp->ldo_en, 1);
+-
+-		if (error) {
+-			PERR("gpio_direction_output(ldo_en) failed.");
+-			return error;
+-		}
+-	} else {
+-		PERR("failed");
+-	}
+-
+-	return error;
+-}
+-
+-/* -------------------------------------------------------------------- */
+-static int fpc_btp_reset_init(struct fpc_btp_data_t *fpc_btp,
+-					struct fpc_btp_platform_data *pdata)
+-{
+-	int error = 0;
+-
+-	PINFO("enter");
+-
+-	if (gpio_is_valid(pdata->reset_gpio)) {
+-
+-		PINFO("Assign HW reset -> GPIO%d",
+-				 pdata->reset_gpio);
+-
+-		error = gpio_request(pdata->reset_gpio, "fpc_btp_reset");
+-
+-		if (error) {
+-			PERR("gpio_request (reset) failed.");
+-			return error;
+-		}
+-
+-		fpc_btp->reset_gpio = pdata->reset_gpio;
+-
+-		error = gpio_direction_output(fpc_btp->reset_gpio, 1);
+-
+-		if (error) {
+-			PERR("gpio_direction_output(reset) failed.");
+-			return error;
+-		}
+-	} else {
+-		PERR("failed");
+-	}
+-
+-	return error;
+-}
+-
+-/* -------------------------------------------------------------------- */
+-static int fpc_btp_cs_init(struct fpc_btp_data_t *fpc_btp,
+-					struct fpc_btp_platform_data *pdata)
+-{
+-	int error = 0;
+-
+-	PINFO("enter");
+-
+-	if (gpio_is_valid(pdata->cs_gpio)) {
+-
+-		PINFO("Assign CS -> GPIO%d", pdata->cs_gpio);
+-
+-		error = gpio_request(pdata->cs_gpio, "fpc_btp_cs");
+-
+-		if (error) {
+-			PERR("gpio_request (cs) failed.");
+-			return error;
+-		}
+-
+-		fpc_btp->cs_gpio = pdata->cs_gpio;
+-
+-		error = gpio_direction_output(fpc_btp->cs_gpio, 0);
+-
+-		if (error) {
+-			PERR("gpio_direction_output(cs) failed.");
+-			return error;
+-		}
+-
+-	} else {
+-		PERR("failed");
+-	}
+-
+-	return error;
+-}
+-
+-/* -------------------------------------------------------------------- */
+-static int
+-fpc_btp_irq_init(struct fpc_btp_data_t *fpc_btp,
+-				 struct fpc_btp_platform_data *pdata)
+-{
+-	int error = 0;
+-
+-	PINFO("enter");
+-
+-	if (gpio_is_valid(pdata->irq_gpio)) {
+-
+-		PINFO("Assign IRQ -> GPIO%d", pdata->irq_gpio);
+-
+-		error = gpio_request(pdata->irq_gpio, "fpc_btp_irq");
+-		if (error) {
+-			PERR("gpio_request (irq) failed.");
+-
+-			return error;
+-		}
+-		fpc_btp->irq_gpio = pdata->irq_gpio;
+-
+-		error = gpio_direction_input(fpc_btp->irq_gpio);
+-
+-		if (error) {
+-			PERR("gpio_direction_input (irq) failed.");
+-			return error;
+-		}
+-	} else {
+-		return -EINVAL;
+-	}
+-
+-	fpc_btp->irq = gpio_to_irq(fpc_btp->irq_gpio);
+-
+-	if (fpc_btp->irq < 0) {
+-		PERR("gpio_to_irq failed.");
+-		error = fpc_btp->irq;
+-		return error;
+-	}
+-
+-#ifndef INTERRUPT_INPUT_REPORT
+-	error = request_irq(fpc_btp->irq, fpc_btp_interrupt,
+-			IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+-			"fpc_btp", fpc_btp);
+-
+-	if (error) {
+-		PERR("request_irq %i failed.", fpc_btp->irq);
+-		fpc_btp->irq = -EINVAL;
+-		return error;
+-	}
+-#endif
+-	return error;
+-}
+-
+-/* -------------------------------------------------------------------- */
+-#ifdef FEATURE_FPC_USE_XO
+-static int fpc_btp_spi_clk(struct fpc_btp_data_t *fpc_btp)
+-{
+-	int error = 0;
+-	struct clk *btp_clk;
+-
+-	PINFO("enter");
+-
+-	btp_clk = clk_get(&fpc_btp->spi->dev, "fpc_xo");
+-	if (IS_ERR(btp_clk)) {
+-		error = PTR_ERR(btp_clk);
+-		PERR("could not get clock");
+-		goto out_err;
+-	}
+-
+-	/* We enable/disable the clock only to assure it works */
+-	error = clk_prepare_enable(btp_clk);
+-	if (error) {
+-		PERR("could not enable clock");
+-		goto out_err;
+-	}
+-	/* clk_disable_unprepare(btp_clk); */
+-
+-out_err:
+-	return error;
+-}
+-#endif
+-
+-/* -------------------------------------------------------------------- */
+-static int fpc_btp_get_of_pdata(struct device *dev,
+-					struct fpc_btp_platform_data *pdata)
+-{
+-	struct device_node *node = dev->of_node;
+-
+-	u32 irq_prop = of_get_named_gpio(node, "fpc,gpio_irq",   0);
+-	u32 rst_prop = of_get_named_gpio(node, "fpc,gpio_reset", 0);
+-	u32 cs_prop  = of_get_named_gpio(node, "fpc,gpio_cs",    0);
+-	u32 ldo_prop = of_get_named_gpio(node, "fpc,ldo_en",    0);
+-
+-	PINFO("enter");
+-
+-	if (node == NULL) {
+-		PERR("Could not find OF device node");
+-		goto of_err;
+-	}
+-
+-	if (!irq_prop || !rst_prop || !cs_prop) {
+-		PINFO("Missing OF property");
+-		goto of_err;
+-	}
+-
+-	pdata->irq_gpio   = irq_prop;
+-	pdata->reset_gpio = rst_prop;
+-	pdata->cs_gpio    = cs_prop;
+-	pdata->ldo_en     = ldo_prop;
+-	if (of_property_read_u32(node, "use_regulator", &pdata->use_regulator)) {
+-		PERR("Missing OF property");
+-		goto of_err;
+-	}
+-	PINFO("use_regulator: %d", pdata->use_regulator);
+-	if (of_property_read_u32(node, "qcom,qup-id", &pdata->qup_id)) {
+-		PERR("Missing OF property");
+-		goto of_err;
+-	}
+-	PINFO("qup_id: %d", pdata->qup_id);
+-
+-	return 0;
+-
+-of_err:
+-	pdata->reset_gpio = -EINVAL;
+-	pdata->irq_gpio   = -EINVAL;
+-	pdata->cs_gpio    = -EINVAL;
+-	pdata->ldo_en     = -EINVAL;
+-	pdata->use_regulator = -EINVAL;
+-	pdata->qup_id     = -EINVAL;
+-
+-	return -ENODEV;
+-}
+-/* -------------------------------------------------------------------- */
+-static int fpc_btp_regulator_init(struct fpc_btp_data_t *fpc_btp,
+-					struct fpc_btp_platform_data *pdata)
+-{
+-	int error = 0;
+-	struct regulator *vreg;
+-
+-	PINFO("enter!!");
+-
+-	fpc_btp->power_on = false;
+-	pdata->vreg = NULL;
+-	vreg = devm_regulator_get(fpc_btp->dev, "fpc,vddio");
+-	if (IS_ERR(vreg)) {
+-		error = PTR_ERR(vreg);
+-		PERR("Regulator get failed, error=%d", error);
+-		return error;
+-	}
+-
+-	if (regulator_count_voltages(vreg) > 0) {
+-		error = regulator_set_voltage(vreg,
+-			FPC_BTP_VOLTAGE_MIN, FPC_BTP_VOLTAGE_MAX);
+-		if (error) {
+-			PERR("regulator set_vtg failed error=%d", error);
+-			goto err;
+-		}
+-	}
+-
+-/* block regulator_set_optimum_mode()
+-   because of rock-bottem issue (delta 10mA under) after Post-CS migration */
+-#if 0
+-	if(regulator_count_voltages(vreg) > 0) {
+-		error = regulator_set_optimum_mode(vreg, FPC_BTP_LOAD_UA);
+-		if(error < 0) {
+-			PERR("unable to set current");
+-			goto err;
+-		}
+-	}
+-#endif
+-	pdata->vreg = vreg;
+-	return error;
+-err:
+-	//regulator_put(vreg);
+-	return error;
+-}
+-
+-
+-/* -------------------------------------------------------------------- */
+-static int fpc_btp_regulator_set(struct fpc_btp_data_t *fpc_btp, bool enable)
+-{
+-	int error = 0;
+-	struct fpc_btp_platform_data *pdata = fpc_btp->platform_pdata;
+-
+-	PINFO("power %s!!", (enable) ? "on" : "off");
+-
+-	if(enable) {
+-		if(!fpc_btp->power_on)
+-			error = regulator_enable(pdata->vreg);
+-	} else {
+-		if(fpc_btp->power_on)
+-			error = regulator_disable(pdata->vreg);
+-	}
+-
+-	if(error < 0)
+-		PERR("can't set(%d) regulator, error(%d)", enable, error);
+-	else
+-		fpc_btp->power_on = enable;
+-
+-	return error;
+-}
+-
+-#ifdef FEATURE_FPC_USE_PINCTRL
+-static int fpc_btp_pinctrl_init(struct fpc_btp_data_t *fpc_btp)
+-{
+-	struct pinctrl *fpc_pinctrl;
+-	struct pinctrl_state *gpio_state_suspend;
+-
+-	fpc_pinctrl = devm_pinctrl_get(&(fpc_btp->spi->dev));
+-
+-	if (IS_ERR_OR_NULL(fpc_pinctrl)) {
+-		PERR("Getting pinctrl handle failed");
+-		return -EINVAL;
+-	}
+-	gpio_state_suspend
+-		= pinctrl_lookup_state(fpc_pinctrl, "gpio_fpc_suspend");
+-
+-	if (IS_ERR_OR_NULL(gpio_state_suspend)) {
+-		PERR("Failed to get the suspend state pinctrl handle");
+-		return -EINVAL;
+-	}
+-
+-	if (pinctrl_select_state(fpc_pinctrl, gpio_state_suspend)) {
+-		PERR("error on pinctrl_select_state");
+-		return -EINVAL;
+-	} else {
+-		PERR("success to set pinctrl_select_state");
+-	}
+-
+-	return 0;
+-}
+-#endif
+-
+-/* -------------------------------------------------------------------- */
+-/* this never fails.*/
+-static int fpc_btp_ldo_en_set(struct fpc_btp_data_t *fpc_btp, bool enable)
+-{
+-	PINFO("ldo_en %s!!",(enable)?"on":"off");
+-
+-	if(enable) {
+-		if(!fpc_btp->power_on)
+-			gpio_set_value(fpc_btp->ldo_en, 1);
+-	} else {
+-		if(fpc_btp->power_on)
+-			gpio_set_value(fpc_btp->ldo_en, 0);
+-	}
+-	fpc_btp->power_on = enable;
+-	return 0;
+-}
+-
+-/* -------------------------------------------------------------------- */
+-static int fpc_btp_gpio_reset(struct fpc_btp_data_t *fpc_btp)
+-{
+-	int error = 0;
+-	int counter = FPC_BTP_RESET_RETRIES;
+-
+-	while (counter) {
+-		counter--;
+-
+-		/* gpio_set_value(fpc_btp->reset_gpio, 0); */
+-		gpio_direction_output(fpc_btp->reset_gpio, 0);
+-		udelay(1000);
+-		/* mdelay(2); */
+-
+-		/* gpio_set_value(fpc_btp->reset_gpio, 1); */
+-		gpio_direction_output(fpc_btp->reset_gpio, 1);
+-		udelay(1250);
+-		/* mdelay(3); */
+-
+-		error = gpio_get_value(fpc_btp->irq_gpio) ? 0 : -EIO;
+-		if (!error) {
+-			counter = 0;
+-		} else {
+-			PINFO("timed out,retrying ...");
+-
+-			udelay(1250);
+-		}
+-	}
+-
+-	return error;
+-}
+-
+-/* -------------------------------------------------------------------- */
+-static int fpc_btp_sleep(struct fpc_btp_data_t *fpc_btp, bool deep_sleep)
+-{
+-	if (deep_sleep &&  gpio_is_valid(fpc_btp->reset_gpio)) {
+-		/* hyojin.an */
+-		/* Kenel panic because gpio_set_value(fpc_btp->cs_gpio, 0); */
+-		/* gpio_set_value(fpc_btp->reset_gpio, 0); */
+-		gpio_direction_output(fpc_btp->reset_gpio, 0);
+-		PDEBUG("reset_gpio -> 0");
+-	}
+-
+-	if (deep_sleep && gpio_is_valid(fpc_btp->cs_gpio)) {
+-		/* gpio_set_value(fpc_btp->cs_gpio, 0); */
+-		gpio_direction_output(fpc_btp->cs_gpio, 0);
+-		PDEBUG("cs_gpio -> 0");
+-	}
+-
+-	PDEBUG("sleep OK");
+-
+-	return 0;
+-}
+-
+-/* -------------------------------------------------------------------- */
+-static irqreturn_t fpc_btp_interrupt(int irq, void *_fpc_btp)
+-{
+-	struct fpc_btp_data_t *fpc_btp = _fpc_btp;
+-	int gpio_value;
+-
+-	gpio_value = gpio_get_value(fpc_btp->irq_gpio);
+-	PINFO("interrupt:(%d)", gpio_value);
+-
+-#ifdef INTERRUPT_INPUT_REPORT
+-	if(gpio_value) {
+-		input_report_rel(fpc_btp->input, FPC_BTP_INTERRUPT, 1);
+-		input_sync(fpc_btp->input);
+-	}
+-#endif
+-	return IRQ_HANDLED;
+-}
+-/* -------------------------------------------------------------------- */
+-/* Example of a change in BAM Pipe ownership */
+-static int spi_change_pipe_owner(struct fpc_btp_data_t *fpc_btp, bool to_tz)
+-{
+-       struct scm_desc desc; /* scm call descriptor */
+-       int ret;
+-
+-       /* CMD ID to change BAM PIPE Owner*/
+-       desc.arginfo = SCM_ARGS(2);
+-       desc.args[0] = fpc_btp->qup_id;
+-       desc.args[1] = (to_tz) ? AC_TZ : AC_HLOS;
+-
+-       /* scm_call failed: func id 0x2000403, arginfo: 0x2, args:0:10.439 */
+-       ret = scm_call2(SCM_SIP_FNID(SCM_SVC_TZ,
+-                                       TZ_BLSP_MODIFY_OWNERSHIP_ID), &desc);
+-
+-       if(ret || desc.ret[0]) {
+-               PERR("ownership change failed!!");
+-               return -1;
+-       }
+-
+-       /* set spi ownership flag */
+-       fpc_btp->pipe_owner = to_tz;
+-
+-       return 0;
+-}
+diff --git a/drivers/input/fingerprint/fpc_btp.h b/drivers/input/fingerprint/fpc_btp.h
+deleted file mode 100644
+index 6f7238d55f9c..000000000000
+--- a/drivers/input/fingerprint/fpc_btp.h
++++ /dev/null
+@@ -1,24 +0,0 @@
+-/* FPC1021 Area sensor driver
+- *
+- * Copyright (c) 2013 Fingerprint Cards AB <tech@fingerprints.com>
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License Version 2
+- * as published by the Free Software Foundation.
+- */
+-
+-#ifndef LINUX_SPI_FPC_BTP_H
+-#define LINUX_SPI_FPC_BTP_H
+-
+-struct fpc_btp_platform_data {
+-	int irq_gpio;
+-	int reset_gpio;
+-	int cs_gpio;
+-	int ldo_en;
+-	int qup_id;
+-	int use_regulator;
+-	struct regulator *vreg;
+-};
+-
+-#endif
+-
+diff --git a/drivers/input/fingerprint/fpc_btp_regs.h b/drivers/input/fingerprint/fpc_btp_regs.h
+deleted file mode 100644
+index 25539d088ca9..000000000000
+--- a/drivers/input/fingerprint/fpc_btp_regs.h
++++ /dev/null
+@@ -1,82 +0,0 @@
+-/* FPC1021 Area sensor driver
+- *
+- * Copyright (c) 2013 Fingerprint Cards AB <tech@fingerprints.com>
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License Version 2
+- * as published by the Free Software Foundation.
+- */
+-
+-#ifndef __FPC_BTP_REGS_H
+-#define __FPC_BTP_REGS_H
+-
+-typedef enum {
+-	FPC_BTP_REG_FPC_STATUS 			= 20, 	// RO, 1 bytes
+-	FPC_BTP_REG_READ_INTERRUPT		= 24,	// RO, 1 byte
+-	FPC_BTP_REG_READ_INTERRUPT_WITH_CLEAR 	= 28,   // RO, 1 byte
+-	FPC_BTP_REG_READ_ERROR_WITH_CLEAR 	= 56, 	// RO, 1 byte
+-	FPC_BTP_REG_MISO_EDGE_RIS_EN 		= 64, 	// WO, 1 byte
+-	FPC_BTP_REG_FPC_CONFIG 			= 68, 	// RW, 1 byte
+-	FPC_BTP_REG_IMG_SMPL_SETUP 		= 76, 	// RW, 3 bytes
+-	FPC_BTP_REG_CLOCK_CONFIG 		= 80, 	// RW, 1 byte
+-	FPC_BTP_REG_IMG_CAPT_SIZE 		= 84, 	// RW, 4 bytes
+-	FPC_BTP_REG_IMAGE_SETUP 		= 92,	// RW, 1 byte
+-	FPC_BTP_REG_ADC_TEST_CTRL 		= 96, 	// RW, 1 byte
+-	FPC_BTP_REG_IMG_RD 			= 100, 	// RW, 1 byte
+-	FPC_BTP_REG_SAMPLE_PX_DLY 		= 104, 	// RW, 8 bytes
+-	FPC_BTP_REG_PXL_RST_DLY 		= 108, 	// RW, 1 byte
+-	FPC_BTP_REG_TST_COL_PATTERN_EN 		= 120, 	// RW, 2 bytes
+-	FPC_BTP_REG_CLK_BIST_RESULT 		= 124, 	// RW, 4 bytes
+-	FPC_BTP_REG_ADC_WEIGHT_SETUP 		= 132, 	// RW, 1 byte
+-	FPC_BTP_REG_ANA_TEST_MUX		= 136, 	// RW, 4 bytes
+-	FPC_BTP_REG_FINGER_DRIVE_CONF 		= 140, 	// RW, 1 byte
+-	FPC_BTP_REG_FINGER_DRIVE_DLY 		= 144, 	// RW, 1 byte
+-	FPC_BTP_REG_OSC_TRIM 			= 148, 	// RW, 2 bytes
+-	FPC_BTP_REG_ADC_WEIGHT_TABLE 		= 152,	// RW, 10 bytes
+-	FPC_BTP_REG_ADC_SETUP 			= 156, 	// RW, 5 bytes
+-	FPC_BTP_REG_ADC_SHIFT_GAIN 		= 160, 	// RW, 2 bytes
+-	FPC_BTP_REG_BIAS_TRIM 			= 164,	// RW, 1 byte
+-	FPC_BTP_REG_PXL_CTRL 			= 168, 	// RW, 2 bytes
+-	FPC_BTP_REG_FPC_DEBUG 			= 208, 	// RO, 2 bytes
+-	FPC_BTP_REG_FINGER_PRESENT_STATUS	= 212, 	// RO, 2 bytes
+-	FPC_BTP_REG_FNGR_DET_THRES 		= 216, 	// RW, 1 byte
+-	FPC_BTP_REG_FNGR_DET_CNTR 		= 220, 	// RW, 2 bytes
+-	FPC_BTP_REG_HWID 			= 252, 	// RO, 2 bytes
+-} fpc_btp_reg_t;
+-
+-#define FPC_BTP_REG_SIZE(reg) (				    	\
+-	((reg) == FPC_BTP_REG_FPC_STATUS)? 			1 : \
+-	((reg) == FPC_BTP_REG_READ_INTERRUPT)?			1 : \
+-	((reg) == FPC_BTP_REG_READ_INTERRUPT_WITH_CLEAR)?	1 : \
+-	((reg) == FPC_BTP_REG_READ_ERROR_WITH_CLEAR)? 		1 : \
+-	((reg) == FPC_BTP_REG_MISO_EDGE_RIS_EN)? 		1 : \
+-	((reg) == FPC_BTP_REG_FPC_CONFIG)? 			1 : \
+-	((reg) == FPC_BTP_REG_IMG_SMPL_SETUP)? 			3 : \
+-	((reg) == FPC_BTP_REG_CLOCK_CONFIG)?			1 : \
+-	((reg) == FPC_BTP_REG_IMG_CAPT_SIZE)? 			4 : \
+-	((reg) == FPC_BTP_REG_IMAGE_SETUP)?			1 : \
+-	((reg) == FPC_BTP_REG_ADC_TEST_CTRL)? 			1 : \
+-	((reg) == FPC_BTP_REG_IMG_RD)?				1 : \
+-	((reg) == FPC_BTP_REG_SAMPLE_PX_DLY)?			8 : \
+-	((reg) == FPC_BTP_REG_PXL_RST_DLY)?			1 : \
+-	((reg) == FPC_BTP_REG_TST_COL_PATTERN_EN)?		2 : \
+-	((reg) == FPC_BTP_REG_CLK_BIST_RESULT)?			4 : \
+-	((reg) == FPC_BTP_REG_ADC_WEIGHT_SETUP)? 		1 : \
+-	((reg) == FPC_BTP_REG_ANA_TEST_MUX)?			4 : \
+-	((reg) == FPC_BTP_REG_FINGER_DRIVE_CONF)?		1 : \
+-	((reg) == FPC_BTP_REG_FINGER_DRIVE_DLY)? 		1 : \
+-	((reg) == FPC_BTP_REG_OSC_TRIM)?			2 : \
+-	((reg) == FPC_BTP_REG_ADC_WEIGHT_TABLE)? 		10: \
+-	((reg) == FPC_BTP_REG_ADC_SETUP)?			5 : \
+-	((reg) == FPC_BTP_REG_ADC_SHIFT_GAIN)? 			2 : \
+-	((reg) == FPC_BTP_REG_BIAS_TRIM)?			1 : \
+-	((reg) == FPC_BTP_REG_PXL_CTRL)? 			2 : \
+-	((reg) == FPC_BTP_REG_FPC_DEBUG)?			2 : \
+-	((reg) == FPC_BTP_REG_FINGER_PRESENT_STATUS)?		2 : \
+-	((reg) == FPC_BTP_REG_FNGR_DET_THRES)? 			1 : \
+-	((reg) == FPC_BTP_REG_FNGR_DET_CNTR)? 			2 : \
+-	((reg) == FPC_BTP_REG_HWID)? 				2 : 0 )
+-
+-#endif // __FPC_BTP_REGS_H
+-
+-
+diff --git a/drivers/input/fingerprint/fpc_log.h b/drivers/input/fingerprint/fpc_log.h
+deleted file mode 100644
+index 5d494b493d97..000000000000
+--- a/drivers/input/fingerprint/fpc_log.h
++++ /dev/null
+@@ -1,63 +0,0 @@
+-#ifndef __FPC_LOG_H
+-#define __FPC_LOG_H
+-
+-#include <linux/kernel.h>
+-
+-/*! ERROR LOG LEVEL */
+-#define LOG_LEVEL_E 3
+-/*! NOTICE LOG LEVEL */
+-#define LOG_LEVEL_N 5
+-/*! INFORMATION LOG LEVEL */
+-#define LOG_LEVEL_I 6
+-/*! DEBUG LOG LEVEL */
+-#define LOG_LEVEL_D 7
+-
+-#ifndef LOG_LEVEL
+-/*! LOG LEVEL DEFINATION */
+-#define LOG_LEVEL LOG_LEVEL_D
+-#endif
+-
+-#ifndef MODULE_TAG
+-/*! MODULE TAG DEFINATION */
+-#define MODULE_TAG "[FINGERPRINT] "
+-#endif
+-
+-#if (LOG_LEVEL >= LOG_LEVEL_E)
+-/*! print error message */
+-#define PERR(fmt, args...) \
+-	pr_err(MODULE_TAG \
+-	"[%s] " fmt "\n", __func__, ##args)
+-#else
+-/*! invalid message */
+-#define PERR(fmt, args...)
+-#endif
+-
+-#if (LOG_LEVEL >= LOG_LEVEL_N)
+-/*! print notice message */
+-#define PNOTICE(fmt, args...) \
+-	pr_notice(MODULE_TAG \
+-	"[%s] " fmt "\n", __func__, ##args)
+-#else
+-/*! invalid message */
+-#define PNOTICE(fmt, args...)
+-#endif
+-
+-#if (LOG_LEVEL >= LOG_LEVEL_I)
+-/*! print information message */
+-#define PINFO(fmt, args...) pr_info(MODULE_TAG \
+-	"[%s] " fmt "\n", __func__, ##args)
+-#else
+-/*! invalid message */
+-#define PINFO(fmt, args...)
+-#endif
+-
+-#if (LOG_LEVEL >= LOG_LEVEL_D)
+-#define PDEBUG(fmt, args...) pr_devel(MODULE_TAG \
+-	"[%s] " fmt "\n", __func__, ##args)
+-#else
+-/*! invalid message */
+-#define PDEBUG(fmt, args...)
+-#endif
+-
+-#endif/*__FPC_LOG_H*/
+-/*@}*/
+-- 
+2.17.2
+

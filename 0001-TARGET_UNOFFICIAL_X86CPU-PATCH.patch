@@ -1,0 +1,40 @@
+From 68c87349e37fd2948a7e5be58fcfcd842eed02f8 Mon Sep 17 00:00:00 2001
+From: Eric Meddaugh <eric@meddaughs.com>
+Date: Thu, 10 Oct 2019 13:14:19 -0400
+Subject: [PATCH] TARGET_UNOFFICIAL_X86CPU PATCH
+
+Change-Id: Ie1e73d77d8d3b9224b9202e6f8fed35fdc4ece6f
+---
+ config/common.mk | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/config/common.mk b/config/common.mk
+index 837e11ef..a4981a6f 100644
+--- a/config/common.mk
++++ b/config/common.mk
+@@ -303,11 +303,11 @@ ifdef LINEAGE_BUILDTYPE
+     endif
+ else
+     # If LINEAGE_BUILDTYPE is not defined, set to UNOFFICIAL
+-    LINEAGE_BUILDTYPE := UNOFFICIAL
++    LINEAGE_BUILDTYPE := $(TARGET_UNOFFICIAL_X86CPU)
+     LINEAGE_EXTRAVERSION :=
+ endif
+ 
+-ifeq ($(LINEAGE_BUILDTYPE), UNOFFICIAL)
++ifeq ($(LINEAGE_BUILDTYPE), $(TARGET_UNOFFICIAL_X86CPU))
+     ifneq ($(TARGET_UNOFFICIAL_BUILD_ID),)
+         LINEAGE_EXTRAVERSION := -$(TARGET_UNOFFICIAL_BUILD_ID)
+     endif
+@@ -352,7 +352,7 @@ LINEAGE_DISPLAY_VERSION := $(LINEAGE_VERSION)
+ 
+ ifneq ($(PRODUCT_DEFAULT_DEV_CERTIFICATE),)
+ ifneq ($(PRODUCT_DEFAULT_DEV_CERTIFICATE),build/target/product/security/testkey)
+-    ifneq ($(LINEAGE_BUILDTYPE), UNOFFICIAL)
++    ifneq ($(LINEAGE_BUILDTYPE), $(TARGET_UNOFFICIAL_X86CPU))
+         ifndef TARGET_VENDOR_RELEASE_BUILD_ID
+             ifneq ($(LINEAGE_EXTRAVERSION),)
+                 # Remove leading dash from LINEAGE_EXTRAVERSION
+-- 
+2.17.2
+

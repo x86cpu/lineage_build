@@ -1,0 +1,26 @@
+From 1438c2d4ec5a39e5297ccca9698f14cab8acddbd Mon Sep 17 00:00:00 2001
+From: Eric Meddaugh <eric@meddaughs.com>
+Date: Fri, 5 Jul 2019 13:25:40 -0400
+Subject: [PATCH] v20: Update fingerprint to 2.1 for Oreo
+
+Change-Id: I1241370456f5cf111618e1f84cd25915f774b5fe
+---
+ v20.mk | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/v20.mk b/v20.mk
+index 11801629..cb3164b5 100644
+--- a/v20.mk
++++ b/v20.mk
+@@ -42,7 +42,7 @@ PRODUCT_PACKAGES += \
+ 
+ # Fingerprint
+ PRODUCT_PACKAGES += \
+-    android.hardware.biometrics.fingerprint@2.0-service
++    android.hardware.biometrics.fingerprint@2.1-service
+ 
+ # IR
+ PRODUCT_PACKAGES += \
+-- 
+2.17.2
+

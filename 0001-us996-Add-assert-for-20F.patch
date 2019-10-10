@@ -1,0 +1,37 @@
+From c06a45af2edab00cd2ddbe378b8d6e4bcdc7c29d Mon Sep 17 00:00:00 2001
+From: Eric Meddaugh <eric@meddaughs.com>
+Date: Fri, 5 Jul 2019 13:37:43 -0400
+Subject: [PATCH] us996: Add assert for 20F
+
+* Updates for Oreo fingerprint
+
+Change-Id: If8f828246e567d93c348ecd6fa692ace65c3a1ea
+---
+ BoardConfig.mk | 3 +++
+ board-info.txt | 1 +
+ 2 files changed, 4 insertions(+)
+ create mode 100644 board-info.txt
+
+diff --git a/BoardConfig.mk b/BoardConfig.mk
+index 81a0051..0e6e95a 100644
+--- a/BoardConfig.mk
++++ b/BoardConfig.mk
+@@ -24,5 +24,8 @@ TARGET_OTA_ASSERT_DEVICE := us996
+ # Kernel
+ TARGET_KERNEL_CONFIG := lineageos_us996_defconfig
+ 
++# Assertions
++TARGET_BOARD_INFO_FILE := $(DEVICE_PATH)/board-info.txt
++
+ # inherit from the proprietary version
+ -include vendor/lge/us996/BoardConfigVendor.mk
+diff --git a/board-info.txt b/board-info.txt
+new file mode 100644
+index 0000000..f53d2e6
+--- /dev/null
++++ b/board-info.txt
+@@ -0,0 +1 @@
++require version-min-trustzone=TZ.BF.4.0.1-176180
+-- 
+2.17.2
+

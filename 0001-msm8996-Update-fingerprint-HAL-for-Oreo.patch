@@ -1,0 +1,98 @@
+From abd5c7ebad6810684c3501938548bf307ff1147d Mon Sep 17 00:00:00 2001
+From: Eric Meddaugh <eric@meddaughs.com>
+Date: Fri, 5 Jul 2019 13:23:46 -0400
+Subject: [PATCH] msm8996: Update fingerprint HAL for Oreo
+
+Change-Id: I77cee750b964d71a841b01741d45bfb4053c2f4f
+---
+ rootdir/etc/init.qcom.rc     | 28 +++++++++++-----------------
+ sepolicy/file_contexts       |  2 +-
+ sepolicy/fpc_early_loader.te | 15 ---------------
+ 3 files changed, 12 insertions(+), 33 deletions(-)
+ delete mode 100644 sepolicy/fpc_early_loader.te
+
+diff --git a/rootdir/etc/init.qcom.rc b/rootdir/etc/init.qcom.rc
+index 3f0b901afa..08e1c61978 100755
+--- a/rootdir/etc/init.qcom.rc
++++ b/rootdir/etc/init.qcom.rc
+@@ -347,16 +347,17 @@ on boot
+     chmod 0660 /sys/devices/virtual/input/lge_fingerprint/qup_id
+     chmod 0220 /sys/devices/virtual/input/lge_fingerprint/waitfinger
+     chmod 0660 /sys/devices/virtual/input/lge_fingerprint/spi_prepare
+-    chown system input /sys/bus/spi/devices/spi8.1/bus_lock
+-    chown system input /sys/bus/spi/devices/spi8.1/clk_enable
+-    chown system input /sys/bus/spi/devices/spi8.1/fabric_vote
+-    chown system input /sys/bus/spi/devices/spi8.1/hw_reset
+-    chown system input /sys/bus/spi/devices/spi8.1/irq
+-    chown system input /sys/bus/spi/devices/spi8.1/pinctl_set
+-    chown system input /sys/bus/spi/devices/spi8.1/spi_prepare
+-    chown system input /sys/bus/spi/devices/spi8.1/spi_owner
+-    chown system input /sys/bus/spi/devices/spi8.1/regulator_enable
+-    chown system input /sys/bus/spi/devices/spi8.1/wakeup_enable
++    # FPC device permission
++    chown system input /sys/devices/virtual/input/lge_fingerprint/bus_lock
++    chown system input /sys/devices/virtual/input/lge_fingerprint/clk_enable
++    chown system input /sys/devices/virtual/input/lge_fingerprint/fabric_vote
++    chown system input /sys/devices/virtual/input/lge_fingerprint/hw_reset
++    chown system input /sys/devices/virtual/input/lge_fingerprint/irq
++    chown system input /sys/devices/virtual/input/lge_fingerprint/pinctl_set
++    chown system input /sys/devices/virtual/input/lge_fingerprint/spi_prepare
++    chown system input /sys/devices/virtual/input/lge_fingerprint/spi_owner
++    chown system input /sys/devices/virtual/input/lge_fingerprint/regulator_enable
++    chown system input /sys/devices/virtual/input/lge_fingerprint/wakeup_enable
+ 
+     write /proc/sys/net/core/netdev_max_backlog 5000
+ 
+@@ -952,13 +953,6 @@ service qseeproxydaemon /system/vendor/bin/qseeproxydaemon
+     group system
+     writepid /dev/cpuset/system-background/tasks
+ 
+-# oneshot service that loads fpc tz app in early phase.
+-service fpc_early_loader /vendor/bin/fpc_early_loader
+-    class late_start
+-    user system
+-    group system
+-    oneshot
+-
+ on configure-cpuset
+     # Update foreground and background cpusets
+     write /dev/cpuset/foreground/cpus 0-2
+diff --git a/sepolicy/file_contexts b/sepolicy/file_contexts
+index 5b5a467f9a..52e673d68c 100644
+--- a/sepolicy/file_contexts
++++ b/sepolicy/file_contexts
+@@ -15,9 +15,9 @@
+ /dev/block/platform/soc/624000\.ufshc/by-name/encrypt               u:object_r:metadata_block_device:s0
+ 
+ # Fingerprint
+-/(vendor|system/vendor)/bin/fpc_early_loader                        u:object_r:fpc_early_loader_exec:s0
+ /sys/devices/soc/75b7000\.spi/spi_master/spi8/spi8\.1(/.*)?         u:object_r:sysfs_devices_fingerprint:s0
+ /sys/devices/soc/75ba000\.spi/spi_master/spi12/spi12\.[0-1](/.*)?   u:object_r:sysfs_devices_fingerprint:s0
++/sys/devices/virtual/input/lge_fingerprint(/.*)?                    u:object_r:sysfs_devices_fingerprint:s0
+ 
+ # FRP partition
+ /dev/block/platform/soc/624000\.ufshc/by-name/persistent            u:object_r:frp_block_device:s0
+diff --git a/sepolicy/fpc_early_loader.te b/sepolicy/fpc_early_loader.te
+deleted file mode 100644
+index cacbac3388..0000000000
+--- a/sepolicy/fpc_early_loader.te
++++ /dev/null
+@@ -1,15 +0,0 @@
+-type fpc_early_loader, domain;
+-type fpc_early_loader_exec, exec_type, vendor_file_type, file_type;
+-
+-init_daemon_domain(fpc_early_loader)
+-
+-allow fpc_early_loader tee_device:chr_file { open read write ioctl };
+-allow fpc_early_loader ion_device:chr_file { open read write ioctl };
+-
+-allow fpc_early_loader firmware_file:file { read getattr open };
+-allow fpc_early_loader firmware_file:dir r_dir_perms;
+-
+-allow fpc_early_loader sysfs_devices_fingerprint:dir r_dir_perms;
+-allow fpc_early_loader sysfs_devices_fingerprint:file rw_file_perms;
+-allow fpc_early_loader sysfs_spi:dir r_dir_perms;
+-allow fpc_early_loader sysfs_spi:file r_file_perms;
+-- 
+2.17.2
+

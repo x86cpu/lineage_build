@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+
+  <remote name="gitlabm" fetch="https://gitlab.com/the-muppets/"  />
+
+  <project name="TheMuppets/proprietary_vendor_htc" path="vendor/htc" remote="github" />
+  <project name="TheMuppets/proprietary_vendor_motorola" path="vendor/motorola" remote="github" />
+  <project name="TheMuppets/proprietary_vendor_oneplus" path="vendor/oneplus" remote="github" />
+  <project name="TheMuppets/proprietary_vendor_google" path="vendor/google" remote="github" />
+  <project name="proprietary_vendor_xiaomi" path="vendor/xiaomi" remote="gitlabm" />  
+</manifest>
