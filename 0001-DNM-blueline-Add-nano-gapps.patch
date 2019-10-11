@@ -1,15 +1,45 @@
-From d6b5faf9e5815f5bd3701359a983e2dc4564a9cf Mon Sep 17 00:00:00 2001
+From ccf210619fc4cd3a5927e7c2daadc00a4b49d40e Mon Sep 17 00:00:00 2001
 From: Eric Meddaugh <eric@meddaughs.com>
 Date: Mon, 30 Sep 2019 07:22:41 -0400
-Subject: [PATCH] [DNM]blueline: Add nano gapps
+Subject: [PATCH] blueline: Add nano gapps
 
 * Personal build (should not leak to gerrit)
 
 Change-Id: I1d383a40f42f8ddb9fd92ffaddcae851caf5baf7
 ---
- device-blueline.mk | 4 ++++
- 1 file changed, 4 insertions(+)
+ .../SystemUI/res/values/lineage_config.xml    | 22 +++++++++++++++++++
+ device-blueline.mk                            |  4 ++++
+ 2 files changed, 26 insertions(+)
+ create mode 100644 blueline/overlay-lineage/frameworks/base/packages/SystemUI/res/values/lineage_config.xml
 
+diff --git a/blueline/overlay-lineage/frameworks/base/packages/SystemUI/res/values/lineage_config.xml b/blueline/overlay-lineage/frameworks/base/packages/SystemUI/res/values/lineage_config.xml
+new file mode 100644
+index 0000000..3f41c39
+--- /dev/null
++++ b/blueline/overlay-lineage/frameworks/base/packages/SystemUI/res/values/lineage_config.xml
+@@ -0,0 +1,22 @@
++<!--
++     Copyright (C) 2018 The LineageOS Project
++
++     Licensed under the Apache License, Version 2.0 (the "License");
++     you may not use this file except in compliance with the License.
++     You may obtain a copy of the License at
++
++          http://www.apache.org/licenses/LICENSE-2.0
++
++     Unless required by applicable law or agreed to in writing, software
++     distributed under the License is distributed on an "AS IS" BASIS,
++     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++     See the License for the specific language governing permissions and
++     limitations under the License.
++-->
++<resources>
++
++    <!-- Max visible notification icons -->
++    <integer name="config_maxVisibleNotificationIcons">6</integer>
++    <integer name="config_maxVisibleNotificationIconsWhenDark">7</integer>
++
++</resources>
 diff --git a/device-blueline.mk b/device-blueline.mk
 index 43e928a..61b464c 100644
 --- a/device-blueline.mk
