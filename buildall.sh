@@ -5,11 +5,12 @@ DIR=`pwd`
 cd ${DIR}/../build/
 #
 # BULDDIR is where the "build" repo is stored.
-BUILDIR=`pwd`
+BUILDDIR=`pwd`
 cd ${DIR}
 #
 cd ${DIR}/../lineageos_UNOFFICIAL/
 GDRIVE=`pwd`
+cd ${DIR}
 
 
 #
@@ -151,10 +152,10 @@ fi
 # Custom patch to add X86CPU in UNOFFICIAL BUILD NAMES
 cd ${DIR}/vendor/lineage
 if [ `git log -n 50 | grep -ic TARGET_UNOFFICIAL_X86CPU` -eq 0 ] ; then
-   git am ${BUILDDIR}/0001-KCAL-X86CPU-KCAL-Patch.patch
+   git am ${BUILDDIR}/0001-TARGET_UNOFFICIAL_X86CPU-PATCH.patch
    sleep 2
-   cd ${DIR}
 fi
+cd ${DIR}
 
 #
 # Add KCAL for LG devices in Kernel
@@ -163,8 +164,8 @@ if [ "${LGE}" = "1" ] ; then
    if [ `git log -n 50 | grep -ic 'KCAL: X86CPU KCAL Patch'` -eq 0 ] ; then
       git am ${BUILDDIR}/0001-KCAL-X86CPU-KCAL-Patch.patch
       sleep 2
-      cd ${DIR}
    fi
+   cd ${DIR}
 fi
 
 for DEVICE in ${DEVICES} ; do
@@ -176,8 +177,8 @@ for DEVICE in ${DEVICES} ; do
       if [ `git log -n 50 | grep -ic gapps` -eq 0 ] ; then
          git am ${BUILDDIR}/0001-DNM-blueline-Add-nano-gapps.patch
          sleep 2
-         cd ${DIR}
       fi
+      cd ${DIR}
    fi
 # ASUS Zenfone6, add nano Gapps
    if [ "${DEVICE}" = "I01WD" ] ; then
@@ -185,18 +186,19 @@ for DEVICE in ${DEVICES} ; do
       if [ `git log -n 50 | grep -ic gapps` -eq 0 ] ; then
          git am ${BUILDDIR}/0001-DNM-I01WD-Add-nano-gapps-and-color-temperature.patch
          sleep 2
-         cd ${DIR}
       fi
+      cd ${DIR}
    fi
 # Normal us996, N-Firmware
    if [ "${DEVICE}" = "us996" ] ; then
-         cp -${BUILDDIR}/msm8996-elsa_nao_us-panel.dtsi.us996 ${DIR}/kernel/lge/msm8996/arch/arm64/boot/dts/lge/msm8996-elsa_nao_us/msm8996-elsa_nao_us-panel.dtsi
+         cp -f ${BUILDDIR}/msm8996-elsa_nao_us-panel.dtsi.us996 ${DIR}/kernel/lge/msm8996/arch/arm64/boot/dts/lge/msm8996-elsa_nao_us/msm8996-elsa_nao_us-panel.dtsi
 
          cd ${DIR}/device/lge/us996
          git checkout BoardConfig.mk
          /bin/rm board-info.txt
          git apply ${BUILDDIR}/0001-us996-Add-assert-for-20F.patch
          cp -f ${BUILDDIR}/board-info.txt.us996-10p ${DIR}/device/lge/us996/board-info.txt
+         cd ${DIR}
    fi
 # Normal us996, O-Firmware testing.
    if [ "${DEVICE}" = "us996-O" ] ; then
@@ -219,6 +221,7 @@ for DEVICE in ${DEVICES} ; do
       cd ${DIR}/kernel/lge/msm8996
       git apply ${BUILDDIR}/0001-msm8996-Update-fingerprint-driver-for-Oreo.patch
 
+      cd ${DIR}
       MYDEV=us996
    fi
 # DS = Dirty Santa Model
@@ -231,6 +234,7 @@ for DEVICE in ${DEVICES} ; do
       git apply ${BUILDDIR}/0001-us996-Add-assert-for-20F.patch
       cp -f ${BUILDDIR}/board-info.txt.us996-10p ${DIR}/device/lge/us996/board-info.txt
 
+      cd ${DIR}
       MYDEV=us996
    fi
 # h918 device, PRE 10p model
@@ -284,6 +288,7 @@ for DEVICE in ${DEVICES} ; do
       NEW=`basename ${TMP}`
       cp -p ${NAME} ${GDRIVE}/${NEW}
       cat ${NAME}.md5sum | sed -e's/-us996/-us996-O/' > ${GDRIVE}/${NEW}.md5sum
+      cd ${DIR}
    elif [ "${DEVICE}" = "us996-ds" ] ; then
       cp -f ${BUILDDIR}/-panel.dtsi.us996 ${DIR}/kernel/lge/msm8996/arch/arm64/boot/dts/lge/msm8996-elsa_nao_us/msm8996-elsa_nao_us-panel.dtsi
       TMP=`echo "${NAME}" | sed -e's/-us996/-us996-DS/'`
