@@ -14,5 +14,5 @@ repo sync
 repopick -t p-display-shrink
 repopick -t pie-onehandmode-tile
 repopick -t swipe_screenshot
-repopick 259682  245499  245356  244692  250477  258979 260542  259481  259553  259561  259805 259806  260654
+repopick 263568  259682
 ```
