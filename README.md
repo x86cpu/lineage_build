@@ -9,7 +9,7 @@ My custom build info for my Lineage builds.   Almost all from LineageOS github.
 
 
 ```
-cd ~/android/lineage-16.0
+cd ~/android/lineage-17.0
 repo sync
 repopick -t p-display-shrink
 repopick -t pie-onehandmode-tile
