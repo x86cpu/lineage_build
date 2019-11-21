@@ -266,7 +266,9 @@ for DEVICE in ${DEVICES} ; do
    fi
    cd ${DIR}
 
-   ${BUILDDIR}/notify.sh "START ${DEVICE}"
+   if [ -x "${BUILDDIR}/notify.sh" ] ; then
+      ${BUILDDIR}/notify.sh "${LINEAGE}: START ${DEVICE}"
+   fi
 # Building the device now
    echo "BUILD: ${DEVICE}"
    cd ${DIR}
@@ -322,10 +324,14 @@ for DEVICE in ${DEVICES} ; do
    if [ ${SYNC} -eq 1 ] ; then
       gdrive sync upload --keep-local --delete-extraneous ${GDRIVE} 0B51rjK5Hd_P5NmpwY1o4VmlyaUk
    fi
-   ${BUILDDIR}/notify.sh "DONE ${DEVICE}"
+   if [ -x "${BUILDDIR}/notify.sh" ] ; then
+      ${BUILDDIR}/notify.sh "${LINEAGE}: DONE ${DEVICE}"
+   fi
 done
 
-${BUILDDIR}/notify.sh "DONE ALL"
+if [ -x "${BUILDDIR}/notify.sh" ] ; then
+   ${BUILDDIR}/notify.sh "${LINEAGE}: DONE ALL"
+fi
 
 echo "DONE"
 
