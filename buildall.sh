@@ -128,10 +128,19 @@ fi
 if [ ! -d "${DIR}/vendor/extra" ] ; then
    mkdir ${DIR}/vendor/extra
    cp ${BUILDDIR}/vendor-extra-BoardConfigExtra.mk ${DIR}/vendor/extra/BoardConfigExtra.mk
+   cp ${BUILDDIR}/vendor-extra-product.mk ${DIR}/vendor/extra/product.mk
 fi
 if [ -f "${DIR}/vendor/extra/BoardConfigExtra.mk" ] ; then
    if [ `grep -c x86cpu ${DIR}/vendor/extra/BoardConfigExtra.mk` -eq 0 ] ; then
       cp ${BUILDDIR}/vendor-extra-BoardConfigExtra.mk ${DIR}/vendor/extra/BoardConfigExtra.mk
+   fi
+fi
+if [ ! -f "${DIR}/vendor/extra/procuct.mk" ] ; then
+   cp ${BUILDDIR}/vendor-extra-BoardConfigExtra.mk ${DIR}/vendor/extra/BoardConfigExtra.mk
+fi
+if [ -f "${DIR}/vendor/extra/product.mk" ] ; then
+   if [ `grep -c x86cpu ${DIR}/vendor/extra/product.mk` -eq 0 ] ; then
+      cp ${BUILDDIR}/vendor-extra-product.mk ${DIR}/vendor/extra/product.mk
    fi
 fi
 
