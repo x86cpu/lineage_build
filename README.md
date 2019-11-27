@@ -5,14 +5,11 @@ x86cpu
 My custom build info for my Lineage builds.   Almost all from LineageOS github.
 
 
-10/10/2019: Current repopicks
+11/27/2019: Current repopicks
 
 
 ```
 cd ~/android/lineage-17.0
 repo sync
-repopick -t p-display-shrink
-repopick -t pie-onehandmode-tile
-repopick -t swipe_screenshot
-repopick 263568  259682
+repopick 255831  259434  255979  259720  257172  257177  259308  259309  263007  263116  255650  255647  255651  264687  264688  259448  260411  263896    259996  263677  258825  260416  258304  258819  259315  264689  264690  257065  262575  262576  256792  256793  256795  264691  264692  264693  264694  264695  258176  258177  258178  259449  259310  257000  261292  261642  258204  255667  257247  258753
 ```
