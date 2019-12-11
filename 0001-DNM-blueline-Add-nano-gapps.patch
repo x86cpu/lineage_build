@@ -48,7 +48,7 @@ index 43e928a..61b464c 100644
  PRODUCT_AAPT_PREF_CONFIG := xxhdpi
  PRODUCT_AAPT_PREBUILT_DPI := xxhdpi xhdpi hdpi
  
-+GAPPS_VARIANT := nano
++#GAPPS_VARIANT := nano
 +
  PRODUCT_HARDWARE := blueline
  
@@ -58,7 +58,7 @@ index 43e928a..61b464c 100644
  
  PRODUCT_SYSTEM_DEFAULT_PROPERTIES += ro.com.google.ime.height_ratio=1.2
 +
-+$(call inherit-product, vendor/opengapps/build/opengapps-packages.mk)
++$(call inherit-product, vendor/gapps/arm64/arm64-vendor.mk)
 -- 
 2.17.2
 

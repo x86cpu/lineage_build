@@ -19,7 +19,7 @@ index d457e4ca..0785ef69 100644
  # limitations under the License.
  #
  
-+GAPPS_VARIANT := nano
++#GAPPS_VARIANT := nano
 +
  # Inherit from those products. Most specific first.
  $(call inherit-product, $(SRC_TARGET_DIR)/product/core_64_bit.mk)
@@ -30,7 +30,7 @@ index d457e4ca..0785ef69 100644
      update_engine_client
 +
 +
-+$(call inherit-product, vendor/opengapps/build/opengapps-packages.mk)
++$(call inherit-product, vendor/gapps/arm64/arm64-vendor.mk)
 diff --git a/overlay/frameworks/base/core/res/res/values/config.xml b/overlay/frameworks/base/core/res/res/values/config.xml
 index 76a2cfa9..bc36f7a5 100644
 --- a/overlay/frameworks/base/core/res/res/values/config.xml
