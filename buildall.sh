@@ -1,6 +1,6 @@
 #!/bin/bash
 
-## TOP LEVEL LINEAGE DIR.. ie:  ~/android/lineage-16.0 or ~/android/lineage-17.0
+## TOP LEVEL LINEAGE DIR.. ie:  ~/android/lineage-16.0 or ~/android/lineage-17.1
 DIR=`pwd`
 cd ${DIR}/../build/
 #
