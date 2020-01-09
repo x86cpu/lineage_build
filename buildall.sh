@@ -301,7 +301,8 @@ for DEVICE in ${DEVICES} ; do
       cat ${NAME}.md5sum | sed -e's/-us996/-us996-O/' > ${GDRIVE}/${NEW}.md5sum
       cd ${DIR}
    elif [ "${DEVICE}" = "us996-ds" ] ; then
-      cp -f ${BUILDDIR}/-panel.dtsi.us996 ${DIR}/kernel/lge/msm8996/arch/arm64/boot/dts/lge/msm8996-elsa_nao_us/msm8996-elsa_nao_us-panel.dtsi
+      cp -f ${BUILDDIR}/msm8996-elsa_nao_us-panel.dtsi.us996 ${DIR}/kernel/lge/msm8996/arch/arm64/boot/dts/lge/msm8996-elsa_nao_us/msm8996-elsa_nao_us-panel.dtsi
+
       TMP=`echo "${NAME}" | sed -e's/-us996/-us996-DS/'`
       NEW=`basename ${TMP}`
       cp -p ${NAME} ${GDRIVE}/${NEW}
