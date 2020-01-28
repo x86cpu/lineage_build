@@ -1,42 +1,41 @@
-From 80686dc26cfafbc4b67a59134a8e97cd9ea3825d Mon Sep 17 00:00:00 2001
+From dbd9c3fec988d7e554515165ec061c6aad5c3879 Mon Sep 17 00:00:00 2001
 From: Eric Meddaugh <eric@meddaughs.com>
-Date: Mon, 30 Sep 2019 10:19:23 -0400
-Subject: [PATCH] [DNM]I01WD: Add nano gapps and color temperature
+Date: Tue, 28 Jan 2020 07:28:31 -0500
+Subject: [PATCH] [PATCH] [DNM]I01WD: Add nano gapps and color temperature
 
 * Personal build (should not leak to gerrit)
 
-Change-Id: I91e34fb0bd7ea67ae1b23405b759a4f069f35f7a
+Change-Id: Iead50d647120f1d6a76ceb261a66a8c1aac1cdaa
 ---
- device.mk                                              | 5 +++++
+ device.mk                                              | 4 ++++
  overlay/frameworks/base/core/res/res/values/config.xml | 3 +++
- 2 files changed, 8 insertions(+)
+ 2 files changed, 7 insertions(+)
 
 diff --git a/device.mk b/device.mk
-index d457e4ca..0785ef69 100644
+index 982fa91..11e515a 100644
 --- a/device.mk
 +++ b/device.mk
 @@ -14,6 +14,8 @@
  # limitations under the License.
  #
  
-+GAPPS_VARIANT := nano
++#GAPPS_VARIANT := nano
 +
  # Inherit from those products. Most specific first.
  $(call inherit-product, $(SRC_TARGET_DIR)/product/core_64_bit.mk)
  $(call inherit-product, $(SRC_TARGET_DIR)/product/full_base_telephony.mk)
-@@ -165,3 +167,6 @@ PRODUCT_STATIC_BOOT_CONTROL_HAL := \
+@@ -173,3 +175,5 @@ PRODUCT_PACKAGES += \
  
  PRODUCT_PACKAGES_DEBUG += \
      update_engine_client
 +
-+
-+$(call inherit-product, vendor/opengapps/build/opengapps-packages.mk)
++$(call inherit-product, vendor/gapps/arm64/arm64-vendor.mk)
 diff --git a/overlay/frameworks/base/core/res/res/values/config.xml b/overlay/frameworks/base/core/res/res/values/config.xml
-index 76a2cfa9..bc36f7a5 100644
+index 38ac0f5..422df07 100644
 --- a/overlay/frameworks/base/core/res/res/values/config.xml
 +++ b/overlay/frameworks/base/core/res/res/values/config.xml
-@@ -520,6 +520,9 @@
-         <item>"/system/framework/boot-core-libart.vdex"</item>
+@@ -524,6 +524,9 @@
+         <item>"/system/lib64/libsurfaceflinger.so"</item>
      </string-array>
  
 +    <!-- Minimum color temperature, in Kelvin, supported by Night display. -->
