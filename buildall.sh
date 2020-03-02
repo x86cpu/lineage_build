@@ -192,12 +192,12 @@ for DEVICE in ${DEVICES} ; do
 # ASUS Zenfone6, add nano Gapps
    if [ "${DEVICE}" = "I01WD" ] ; then
       cd ${DIR}/device/asus/I01WD
-      if [ `git log -n 50 | grep -ic gapps` -eq 0 ] ; then
-         git am ${BUILDDIR}/0001-DNM-I01WD-Add-nano-gapps-and-color-temperature.patch
+      if [ `git log -n 50 | grep -ic 'max notification icons'` -eq 0 ] ; then
+         git am ${BUILDDIR}/0001-I01WD-Increase-max-notification-icons.patch
          sleep 2
       fi
-      if [ `git log -n 50 | grep -ic 'Increase max notification'` -eq 0 ] ; then
-         git am ${BUILDDIR}/0001-I01WD-Increase-max-notification-icons.patch
+      if [ `git log -n 50 | grep -ic gapps` -eq 0 ] ; then
+         git am ${BUILDDIR}/0001-DNM-I01WD-Add-nano-gapps-and-color-temperature.patch
          sleep 2
       fi
       cd ${DIR}

@@ -1,7 +1,7 @@
-From 8335c142aec22a53223b900f1266406779095557 Mon Sep 17 00:00:00 2001
+From 8e6a9fe113bcef60d966e6e9e10190f7963da3b3 Mon Sep 17 00:00:00 2001
 From: Eric Meddaugh <eric@meddaughs.com>
 Date: Mon, 22 Apr 2019 12:53:13 -0400
-Subject: [PATCH] I01WD: Increase max notification icons
+Subject: [PATCH 1/2] I01WD: Increase max notification icons
 
 * Device can show more at the top.
 
@@ -13,7 +13,7 @@ Change-Id: I40c71651a4141525334d2650bcb75222897dc00a
 
 diff --git a/overlay-lineage/frameworks/base/packages/SystemUI/res/values/lineage_config.xml b/overlay-lineage/frameworks/base/packages/SystemUI/res/values/lineage_config.xml
 new file mode 100644
-index 0000000..3f41c39
+index 00000000..3f41c392
 --- /dev/null
 +++ b/overlay-lineage/frameworks/base/packages/SystemUI/res/values/lineage_config.xml
 @@ -0,0 +1,22 @@
