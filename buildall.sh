@@ -158,6 +158,35 @@ fi
 cd ${DIR}
 
 #
+if [ "${LINEAGE}" = "lineage-16.0" ] ; then
+# Validate picks... pick if missing .. ONLY 16.0
+   cd frameworks/base
+   if [ `git log -n 50 | grep -ic 'add display shrink mode'` -eq 0 ] ; then
+      cd ${DIR}
+      repopick -t p-display-shrink
+      sleep 2
+   fi
+   cd ${DIR}
+#
+   cd frameworks/base
+   if [ `git log -n 50 | grep -ic 'one hand mode triggers'` -eq 0 ] ; then
+      cd ${DIR}
+      repopick -t pie-onehandmode-tile
+      sleep 2
+   fi
+   cd ${DIR}
+#
+   cd frameworks/base
+   if [ `git log -n 50 | grep -ic '3 finger swipe screenshot'` -eq 0 ] ; then
+      cd ${DIR}
+      repopick -t swipe_screenshot
+      sleep 2
+   fi
+   cd ${DIR}
+fi
+
+cd ${DIR}
+#
 # Add KCAL for LG devices in Kernel
 if [ "${LGE}" = "1" ] ; then
    cd ${DIR}/kernel/lge/msm8996
