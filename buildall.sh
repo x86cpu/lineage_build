@@ -166,6 +166,13 @@ if [ `git log -n 50 | grep -ic TARGET_UNOFFICIAL_X86CPU` -eq 0 ] ; then
 fi
 cd ${DIR}
 
+cd frameworks/base
+if [ `git log -n 50 | grep -ic 'Allow all screenshots'` -eq 0 ] ; then
+   git am ${BUILDDIR}/0001-PATCH-DNM-Allow-all-screenshots.patch
+   sleep 2
+fi
+cd ${DIR}
+
 #
 if [ "${LINEAGE}" = "lineage-16.0" ] ; then
 # Validate picks... pick if missing .. ONLY 16.0
