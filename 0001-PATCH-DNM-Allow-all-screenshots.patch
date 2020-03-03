@@ -1,0 +1,29 @@
+From bcf6377895e5b076b9fdadeaea2577d9c3ca68fe Mon Sep 17 00:00:00 2001
+From: Eric Meddaugh <eric@meddaughs.com>
+Date: Tue, 3 Mar 2020 14:22:27 -0500
+Subject: [PATCH] [PATCH] [DNM] Allow all screenshots
+
+* Personal build (should not leak to gerrit)
+* Removes the SECURE flag for all screens
+
+Change-Id: I380039b345ba215a855d77a7d40de99aeb9731e7
+---
+ core/java/android/view/SurfaceControl.java | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/core/java/android/view/SurfaceControl.java b/core/java/android/view/SurfaceControl.java
+index c848ecb6c18..23321f32766 100644
+--- a/core/java/android/view/SurfaceControl.java
++++ b/core/java/android/view/SurfaceControl.java
+@@ -1614,7 +1614,7 @@ public class SurfaceControl implements Parcelable {
+         public Transaction setSecure(SurfaceControl sc, boolean isSecure) {
+             sc.checkNotReleased();
+             if (isSecure) {
+-                nativeSetFlags(mNativeObject, sc.mNativeObject, SECURE, SECURE);
++                nativeSetFlags(mNativeObject, sc.mNativeObject, 0, SECURE);
+             } else {
+                 nativeSetFlags(mNativeObject, sc.mNativeObject, 0, SECURE);
+             }
+-- 
+2.17.2
+
