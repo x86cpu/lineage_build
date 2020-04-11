@@ -1,15 +1,15 @@
-From ced127f566dfd55d8d6cc2bc783890a72bae9dee Mon Sep 17 00:00:00 2001
+From 5e7cf15851eadbf2079c6148b6a95a7afa54d07c Mon Sep 17 00:00:00 2001
 From: Eric Meddaugh <eric@meddaughs.com>
 Date: Tue, 28 Jan 2020 07:36:14 -0500
-Subject: [PATCH] [PATCH] blueline: Add nano gapps
+Subject: [PATCH] blueline: Add nano gapps
 
 * Personal build (should not leak to gerrit)
 
 Change-Id: I5afe0cc45a2a589756a6f65c35b765001b3d01d7
 ---
  .../SystemUI/res/values/lineage_config.xml    | 22 +++++++++++++++++++
- device-blueline.mk                            |  4 ++++
- 2 files changed, 26 insertions(+)
+ device-blueline.mk                            |  6 +++++
+ 2 files changed, 28 insertions(+)
  create mode 100644 blueline/overlay-lineage/frameworks/base/packages/SystemUI/res/values/lineage_config.xml
 
 diff --git a/blueline/overlay-lineage/frameworks/base/packages/SystemUI/res/values/lineage_config.xml b/blueline/overlay-lineage/frameworks/base/packages/SystemUI/res/values/lineage_config.xml
@@ -41,24 +41,26 @@ index 00000000..3f41c392
 +
 +</resources>
 diff --git a/device-blueline.mk b/device-blueline.mk
-index f0f2f6d5..ae1ee50a 100644
+index f0f2f6d5..b7e4e9ce 100644
 --- a/device-blueline.mk
 +++ b/device-blueline.mk
-@@ -14,6 +14,8 @@
+@@ -14,6 +14,10 @@
  # limitations under the License.
  #
  
 +#GAPPS_VARIANT := nano
++WITH_GMS := true
++WITH_GMS_MINIMAL :=true
 +
  PRODUCT_HARDWARE := blueline
  
  include device/google/crosshatch/device-common.mk
-@@ -33,3 +35,5 @@ PRODUCT_COPY_FILES += \
+@@ -33,3 +37,5 @@ PRODUCT_COPY_FILES += \
      device/google/crosshatch/nfc/libnfc-nxp.blueline.conf:$(TARGET_COPY_OUT_VENDOR)/etc/libnfc-nxp.conf
  
  PRODUCT_PRODUCT_PROPERTIES += ro.com.google.ime.height_ratio=1.2
 +
-+$(call inherit-product, vendor/gapps/arm64/arm64-vendor.mk)
++#$(call inherit-product, vendor/gapps/arm64/arm64-vendor.mk)
 -- 
 2.17.2
 

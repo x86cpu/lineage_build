@@ -1,35 +1,37 @@
-From dbd9c3fec988d7e554515165ec061c6aad5c3879 Mon Sep 17 00:00:00 2001
+From 5b8b3f67463da6eec5574e80022dd53b71913139 Mon Sep 17 00:00:00 2001
 From: Eric Meddaugh <eric@meddaughs.com>
 Date: Tue, 28 Jan 2020 07:28:31 -0500
-Subject: [PATCH] [PATCH] [DNM]I01WD: Add nano gapps and color temperature
+Subject: [PATCH] I01WD: Add nano gapps and color temperature
 
 * Personal build (should not leak to gerrit)
 
 Change-Id: Iead50d647120f1d6a76ceb261a66a8c1aac1cdaa
 ---
- device.mk                                              | 4 ++++
+ device.mk                                              | 6 ++++++
  overlay/frameworks/base/core/res/res/values/config.xml | 3 +++
- 2 files changed, 7 insertions(+)
+ 2 files changed, 9 insertions(+)
 
 diff --git a/device.mk b/device.mk
-index 982fa91..11e515a 100644
+index 982fa91..14f199f 100644
 --- a/device.mk
 +++ b/device.mk
-@@ -14,6 +14,8 @@
+@@ -14,6 +14,10 @@
  # limitations under the License.
  #
  
 +#GAPPS_VARIANT := nano
++WITH_GMS := true
++WITH_GMS_MINIMAL :=true
 +
  # Inherit from those products. Most specific first.
  $(call inherit-product, $(SRC_TARGET_DIR)/product/core_64_bit.mk)
  $(call inherit-product, $(SRC_TARGET_DIR)/product/full_base_telephony.mk)
-@@ -173,3 +175,5 @@ PRODUCT_PACKAGES += \
+@@ -173,3 +177,5 @@ PRODUCT_PACKAGES += \
  
  PRODUCT_PACKAGES_DEBUG += \
      update_engine_client
 +
-+$(call inherit-product, vendor/gapps/arm64/arm64-vendor.mk)
++#$(call inherit-product, vendor/gapps/arm64/arm64-vendor.mk)
 diff --git a/overlay/frameworks/base/core/res/res/values/config.xml b/overlay/frameworks/base/core/res/res/values/config.xml
 index 38ac0f5..422df07 100644
 --- a/overlay/frameworks/base/core/res/res/values/config.xml
