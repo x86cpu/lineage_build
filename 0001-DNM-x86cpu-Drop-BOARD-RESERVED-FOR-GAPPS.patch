@@ -1,0 +1,28 @@
+From 408cb5743d9f4ec34e6e9d7f0faff20e150c704d Mon Sep 17 00:00:00 2001
+From: Eric Meddaugh <eric@meddaughs.com>
+Date: Mon, 21 Sep 2020 15:49:25 -0400
+Subject: [PATCH] DNM: x86cpu, Drop BOARD RESERVED FOR GAPPS
+
+Change-Id: Ifec7bc6e79675762db2181d11cb85a86f9c0fcd4
+---
+ BoardConfigLineage.mk | 7 -------
+ 1 file changed, 7 deletions(-)
+
+diff --git a/BoardConfigLineage.mk b/BoardConfigLineage.mk
+index 70f1f09f..f614a4c4 100644
+--- a/BoardConfigLineage.mk
++++ b/BoardConfigLineage.mk
+@@ -19,10 +19,3 @@ BOARD_VENDORIMAGE_PARTITION_SIZE := 805306368
+ endif
+ BOARD_VENDORIMAGE_FILE_SYSTEM_TYPE := ext4
+ 
+-# Reserve space for gapps install
+-ifneq ($(WITH_GMS),true)
+-BOARD_PRODUCTIMAGE_PARTITION_RESERVED_SIZE := 15728640
+-BOARD_SYSTEMIMAGE_EXTFS_INODE_COUNT := -1
+-BOARD_SYSTEMIMAGE_PARTITION_RESERVED_SIZE := 1887436800
+-BOARD_VENDORIMAGE_PARTITION_RESERVED_SIZE := 15728640
+-endif
+-- 
+2.17.2
+

@@ -219,8 +219,12 @@ for DEVICE in ${DEVICES} ; do
 # Google Pixel3, add nano Gapps
    if [ "${DEVICE}" = "blueline" ] ; then
       cd ${DIR}/device/google/crosshatch
-      if [ `git log -n 50 | grep -ic gapps` -eq 0 ] ; then
+      if [ `git log -n 50 | grep -ic 'add nano gapps'` -eq 0 ] ; then
          git am ${BUILDDIR}/0001-DNM-blueline-Add-nano-gapps.patch
+         sleep 2
+      fi
+      if [ `git log -n 50 | grep -ic 'drop board reserved'` -eq 0 ] ; then
+         git am ${BUILDDIR}/0001-blueline-Add-nano-gapps.patch
          sleep 2
       fi
       cd ${DIR}
