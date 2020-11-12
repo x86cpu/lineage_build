@@ -170,7 +170,7 @@ if [ "${LINEAGE}" = "lineage-16.0" ] ; then
    cd frameworks/base
    if [ `git log -n 50 | grep -ic 'add display shrink mode'` -eq 0 ] ; then
       cd ${DIR}
-      repopick -t p-display-shrink
+      repopick -f -t p-display-shrink
       sleep 2
    fi
    cd ${DIR}
@@ -178,7 +178,7 @@ if [ "${LINEAGE}" = "lineage-16.0" ] ; then
    cd frameworks/base
    if [ `git log -n 50 | grep -ic 'one hand mode triggers'` -eq 0 ] ; then
       cd ${DIR}
-      repopick -t pie-onehandmode-tile
+      repopick -f -t pie-onehandmode-tile
       sleep 2
    fi
    cd ${DIR}
@@ -186,7 +186,7 @@ if [ "${LINEAGE}" = "lineage-16.0" ] ; then
    cd frameworks/base
    if [ `git log -n 50 | grep -ic '3 finger swipe screenshot'` -eq 0 ] ; then
       cd ${DIR}
-      repopick -t swipe_screenshot
+      repopick -f -t swipe_screenshot
       sleep 2
    fi
    cd ${DIR}
