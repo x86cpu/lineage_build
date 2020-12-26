@@ -224,7 +224,7 @@ for DEVICE in ${DEVICES} ; do
          sleep 2
       fi
       if [ `git log -n 50 | grep -ic 'drop board reserved'` -eq 0 ] ; then
-         git am ${BUILDDIR}/0001-blueline-Add-nano-gapps.patch
+         git am ${BUILDDIR}/0001-DNM-x86cpu-Drop-BOARD-RESERVED-FOR-GAPPS.patch
          sleep 2
       fi
       cd ${DIR}
