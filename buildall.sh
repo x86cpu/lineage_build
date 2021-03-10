@@ -172,6 +172,13 @@ if [ `git log -n 50 | grep -ic 'Allow all screenshots'` -eq 0 ] ; then
    sleep 2
 fi
 cd ${DIR}
+# 2nd patch
+cd frameworks/native/services
+if [ `git log -n 50 | grep -ic 'Allow all screenshots'` -eq 0 ] ; then
+   git am ${BUILDDIR}/0001-native-services-DNM-Allow-all-screenshots.patch
+   sleep 2
+fi
+cd ${DIR}
 
 #
 if [ "${LINEAGE}" = "lineage-16.0" ] ; then

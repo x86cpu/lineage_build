@@ -1,0 +1,31 @@
+From a8f40eb89ef96943893892f4c5689d0f37359805 Mon Sep 17 00:00:00 2001
+From: Eric Meddaugh <eric@meddaughs.com>
+Date: Wed, 10 Mar 2021 08:43:18 -0500
+Subject: [PATCH] [DNM] Allow all screenshots
+
+* Personal build (should not leak to gerrit)
+* Returns NO_ERROR for screenshots
+
+Change-Id: Idaf710fa8eca015fef0518631bdab9563a91383d
+---
+ services/surfaceflinger/SurfaceFlinger.cpp | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/services/surfaceflinger/SurfaceFlinger.cpp b/services/surfaceflinger/SurfaceFlinger.cpp
+index db26808cc..56d11439a 100644
+--- a/services/surfaceflinger/SurfaceFlinger.cpp
++++ b/services/surfaceflinger/SurfaceFlinger.cpp
+@@ -6135,8 +6135,8 @@ status_t SurfaceFlinger::captureScreenImplLocked(const RenderArea& renderArea,
+     // use in situations like the Screen-rotation animation and place
+     // the impetus on WindowManager to not persist them.
+     if (outCapturedSecureLayers && !forSystem) {
+-        ALOGW("FB is protected: PERMISSION_DENIED");
+-        return PERMISSION_DENIED;
++        ALOGW("FB is protected: OVERRIDE PERMISSION_DENIED:  NO_ERROR");
++        return NO_ERROR;
+     }
+     renderScreenImplLocked(renderArea, traverseLayers, buffer, useIdentityTransform, outSyncFd);
+     return NO_ERROR;
+-- 
+2.17.2
+
