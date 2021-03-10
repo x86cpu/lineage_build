@@ -1,0 +1,285 @@
+
+
+v20: h918 h910 vs995 us996 ls997
+g5: h830 h850 rs988
+g6: h870 us997 h872
+
+# cd build/make
+# vi core/version_defaults.mk
+
+-      PLATFORM_SECURITY_PATCH := 2019-12-05
++      PLATFORM_SECURITY_PATCH := 2020-01-05
+
+# Pick merge list: 
+# repopick -p -t android-10.0.0_r35
+
+
+# elsa touch
+# d68175a65fc2ad86dba8827697bdbb4a06c5b1cc
+#
+#
+# https://github.com/LineageOS/android_kernel_lge_msm8996/commit/d68175a65fc2ad86dba8827697bdbb4a06c5b1cc
+
+
+sdat2img.py system.transfer.list system.new.dat system.img
+
+# reset to commit
+cd kernel/lge/msm8996/
+
+git reset --hard c34568703cc35ed0ae9dd6b94f40b9ce90278533
+
+
+git commit --author='Zachary Wander <zachary.wander@gmail.com>'
+git commit --author='Blaise <BlaiseD@GMail.com>'
+git commit --date='Tue, 26 Jun 2018 18:34:19 -0500'
+
+    Co-authored-by: Zachary Wander <zachary.wander@gmail.com>
+    Co-authored-by: Blaise <BlaiseD@GMail.com>
+
+
+** 2nd scren
+cd /sys_home/etmsys/android/android_frameworks_base
+#git reset --hard d6acb800338660348c317b2211acb23b37238c14
+#git reset --hard 0016720603b66ac520e6e65e57a00a175ec587ee
+git reset --hard 415e8de02f2a6d8aee91ddae203a5ee24c72bf2e
+** d/l zach:  
+wget -O /tmp/zach.zip https://github.com/zacharee/android_frameworks_base/archive/lineage-15.1-signboa.zip
+ln -s . android_frameworks_base-lineage-15.1-signboa
+unzip /tmp/zach.zip
+rm android_frameworks_base-lineage-15.1-signboa
+git status ##  displays changes
+git add .
+git commit
+*********************
+v20: Second screen
+
+* Squash of commits:
+  https://github.com/zacharee/android_frameworks_base/commits/lineage-15.1-signboa
+* Rebase Lineage android_frameworks_base on top
+
+Co-authored-by: Zachary Wander <zachary.wander@gmail.com>
+Co-authored-by: Blaise <BlaiseD@GMail.com>
+*********************
+git fetch upstream
+git rebase upstream/lineage-15.1
+git push -f
+
+************ BUILD 2nd SCREEN ************
+
+* repo sync all...
+***
+
+****** frameworks/base
+cd /home/etmsys/android/lineage-15.1/frameworks/base
+git fetch x86cpu
+** NOTE: commit will change with above merge..
+git cherry-pick d13a380a8c97738bc84bb119500e41c07c6ed42f
+
+****** system/sepolicy
+cd /home/etmsys/android/lineage-15.1/system/sepolicy
+git fetch zach
+git cherry-pick 2db975bcc7ea40871185b2dffb7d2abb9fbad58e
+
+****** packages/apps/Settings
+cd /home/etmsys/android/lineage-15.1/packages/apps/Settings
+git fetch zach
+git cherry-pick ce2241da603e8bc0aacef69219b6bc90845ea2ac
+
+****** device/lge/v20-common/AOSPSignBoard
+cd /home/etmsys/android/lineage-15.1/device/lge/v20-common
+wget  -O /tmp/AOSPSignBoard.zip https://github.com/zacharee/android_packages_apps_AOSPSignBoard/archive/master.zip
+/bin/rm -rf AOSPSignBoard
+unzip /tmp/AOSPSignBoard.zip
+mv android_packages_apps_AOSPSignBoard-master AOSPSignBoard
+wget  -O  /tmp/ColorPicker.zip https://github.com/jaredrummler/ColorPicker/archive/master.zip
+rmdir AOSPSignBoard/libs/ColorPicker
+unzip /tmp/ColorPicker.zip
+mv ColorPicker-master AOSPSignBoard/libs/ColorPicker
+*
+git checkout v20.mk
+echo >> v20.mk
+echo "# AOSPSignBoard" >> v20.mk
+echo "PRODUCT_PACKAGES += \\" >> v20.mk
+echo "    AOSPSignBoard" >> v20.mk
+
+****** kernel:
+cd /home/etmsys/android/lineage-15.1/kernel/lge/msm8996/arch/arm64/configs
+sed -i -e's/CONFIG_LGE_DISABLE_SECOND_SCREEN.*/CONFIG_LGE_DISABLE_SECOND_SCREEN=n/' lineageos_elsa_common
+echo "CONFIG_BACKLIGHT_PARTIAL_MODE_SUPPORTED=y" >> lineageos_elsa_common
+
+** Build:
+
+make update-api
+
+vi /home/etmsys/android/lineage-15.1/vendor/x86cpu/BoardConfigExtra.mk
+# adjust TARGET_UNOFFICIAL_X86CPU
+
+* as normal
+
+
+******************************************
+
+## package cache corrupt:
+
+adb shell setprop pm.boot.disable_package_cache true
+
+# rebuild only boot/kernel
+
+lunch lineage_us996-userdebug
+# kernel:
+mka bootimage 
+# system: (/system)
+mka systemimage
+# ramdisk: (root)
+mka ramdisk 
+# recovery
+mka recoveryimage
+
+
+## Enginnering
+# eng - Engineering build comes with default root access.
+lunch lineage_us996-eng
+mka bacon
+
+#  test kernel:
+cd $KERNEL
+make ARCH=arm64 lineageos_us996_defconfig
+make mrproper
+git status # Fixed the missing:ie..:
+git checkout firmware/analogix/mi1_eeprom_20_8b.img firmware/anx7418/ocm_crc_08.bin firmware/anx7418/ocm_hamming_13.bin
+
+etmsys   11454 11453  0 15:48 pts/3    00:00:00 make -j4 -C kernel/lge/msm8996 O=/home/etmsys/android/lineage-16.0/out/target/product/h910/obj/KERNEL_OBJ ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- CROSS_COMPILE_ARM32=arm-linux-androideabi- CLANG_TRIPLE=aarch64-linux-gnu- CC=/usr/bin/ccache clang Image.gz-dtb
+etmsys   11457 11454  0 15:48 pts/3    00:00:00 make -C /home/etmsys/android/lineage-16.0/out/target/product/h910/obj/KERNEL_OBJ KBUILD_SRC=/home/etmsys/android/lineage-16.0/kernel/lge/msm8996 -f /home/etmsys/android/lineage-16.0/kernel/lge/msm8996/Makefile Image.gz-dtb
+etmsys   29924  6619  0 15:41 pts/3    00:00:05 /home/etmsys/android/lineage-16.0/out/soong_ui --make-mode -j bacon
+
+
+
+# git clone https://github.com/Rashed97/android_kernel_lge_msm8996.git -b charging rashed
+
+
+** fork and add:
+git clone git@github.com:x86cpu/android_device_lge_h990.git h990
+
+1) rename h910 -> h990 .. file renames and s/h910/h990
+2) update "blobs" or txt ie.. proprietary-files.txt configs/wifi/bcmdhd.cal
+3) update system.prop things
+
+## sepolicy merged cached 
+obj/ETC/
+
+
+
+# from https://help.github.com/articles/syncing-a-fork/#platform-linux
+cd /home/etmsys/android/lineage/vendor/lge
+
+
+git remote -v
+git fetch upstream
+
+#git checkout cm-14.1
+#git merge upstream/cm-14.1
+#git merge upstream/lineage-15.1
+#git merge upstream/lineage-16.0
+
+** DO REBASE:
+# to add back afer pull accepted..
+git rebase upstream/cm-14.1
+git rebase upstream/lineage-15.1
+git rebase upstream/lineage-16.0
+git rebase upstream/lineage-17.0
+git rebase upstream/lineage-17.1
+
+# https://stackoverflow.com/questions/7244321/how-do-i-update-a-github-forked-repository
+# force sync..
+git push -f origin cm-14.1
+git push -f origin lineage-15.1
+
+
+# Add the new branch into mine
+git checkout -b lineage-15.1 upstream/lineage-15.1
+git push -u origin lineage-15.1
+
+
+#
+git remote add upstream        https://github.com/TheMuppets/proprietary_vendor_lge.git
+
+# https://github.com/prasmussen/gdrive
+
+# gdrive list --name-width 0 --query " '0B51rjK5Hd_P5NmpwY1o4VmlyaUk' in parents" --order createdTime
+#
+# gdrive upload --parent "0B51rjK5Hd_P5NmpwY1o4VmlyaUk" <FILE>
+#
+# # /home/etmsys/android/lineageos_UNOFFICIAL
+#
+#
+#
+
+######NO####gdrive sync upload --keep-local --delete-extraneous /home/etmsys/android/lineageos_UNOFFICIAL 0B51rjK5Hd_P5NmpwY1o4VmlyaUk
+
+# https://drive.google.com/drive/folders/0B51rjK5Hd_P5NmpwY1o4VmlyaUk
+
+######NO####gdrive sync upload --keep-local --delete-extraneous /home/etmsys/android/h850 17lUEI4TJS07adBRn21ekzQZkpfox9_5A
+
+# https://drive.google.com/drive/folders/1W6OfmXgCvipLlTUUbGhmQvpTjb8XVk_k
+https://drive.google.com/open?id=1W6OfmXgCvipLlTUUbGhmQvpTjb8XVk_k
+
+######NO####gdrive sync upload --keep-local --delete-extraneous /home/etmsys/android/h918ss 1W6OfmXgCvipLlTUUbGhmQvpTjb8XVk_k
+
+######NO####gdrive sync upload --keep-local --delete-extraneous /home/etmsys/android/Lineage15.1-Test 1d9qB62s5UX4ZzoUQNfACZg39Sx_a8tNv
+
+git remote -v
+git remote add op3 https://github.com/LineageOS/android_device_oneplus_oneplus3
+git remote -v
+git fetch op3
+
+repo start lte device/lge/msm8996-common
+cd device/lge/msm8996-common
+
+   44  repo cherry-pick 393c9e7c808fc6638fba60aeeecae90f9e01fbe8
+
+2ba9ef12aa50ad919b35b9a63834f4b8ba4b81d2 
+
+vi system.prop
+git add system.prop
+git commit
+## Amend
+## copy the "Change-Id: I..." line from the first line of the Description section of the change and amend it to the bottom of the commit message. 
+
+git commit --amend
+repo upload .
+
+
+BOARD_KERNEL_CMDLINE += androidboot.selinux=permissive
+
+# update the API .. frameworks/base/api
+make update-api
+
+## ADJUST changelog
+msm8996: Fix enabled typo
+
+Change-Id: I4567bd384f09dd5ad5119ec3d1b581494725adf0
+(cherry picked from commit 83cc98b676ef2288068e8646b167af0b66ee005d)
+
+   175  9:14    git checkout clang-6.0
+   176  9:14    patchelf --set-rpath '$ORIGIN/../lib64:/opt/glibc-2.18/lib64' clang-6.0
+   178  9:15    patchelf --set-interpreter /opt/glibc-2.18/lib64/ld-linux-x86-64.so.2 clang-6.0
+   179  9:15    ./clang-6.0
+   180  9:15    history
+build.rit.edu{etmsys}181: pwd
+/home/etmsys/android/lineage-16.0/prebuilts/clang/host/linux-x86/clang-4691093/bin
+
+
+****************
+
+cd ../us997
+git init
+git add .
+git commit
+git branch us997
+git checkout us997
+git branch
+git remote add -t us997 origin git@github.com:x86cpu/twrp.git
+git push origin us997
+git commit -m "us997: Updated README"
+git push
+
